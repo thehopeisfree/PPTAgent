@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git -C \"C:\\\\Users\\\\wela\\\\repo\\\\PPTAgent\" log --oneline --all)",
+      "Bash(npx vitest:*)",
+      "Bash(npx playwright:*)",
+      "Bash(npm install:*)",
+      "Bash(npx tsc:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(npx tsx:*)",
+      "Bash(npm test:*)",
+      "Bash(start \"\" \"C:\\\\Users\\\\wela\\\\repo\\\\PPTAgent\\\\demo-ratio-output\\\\debug.html\")",
+      "Bash(gh api:*)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(dir:*)",
+      "Bash(echo:*)",
+      "Bash(python:*)",
+      "Bash(start \"\" \"C:\\\\Users\\\\wela\\\\repo\\\\PPTAgent\\\\sim-rollout\\\\replay.html\")",
+      "Bash(bash:*)",
+      "Bash(tar tzf:*)"
+    ]
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "defects": [],
+  "warnings": [
+    {
+      "type": "occlusion_suspected",
+      "owner_eid": "e_photo2",
+      "other_eid": "e_callout",
+      "details": {
+        "overlap_area_px": 1776,
+        "top_eid": "e_callout"
+      }
+    }
+  ],
+  "summary": {
+    "defect_count": 0,
+    "total_severity": 0,
+    "warning_count": 1,
+    "warning_severity": 1776
+  }
+}

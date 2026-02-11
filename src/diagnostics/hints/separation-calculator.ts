@@ -12,19 +12,23 @@ export function computeSeparationOptions(
   owner: DOMElement,
   other: DOMElement,
 ): SeparationOption[] {
-  // Move down: owner.bbox.y needs to be at other.safeBox.y + other.safeBox.h - SAFE_PADDING
-  const moveDownTarget = other.safeBox.y + other.safeBox.h - SAFE_PADDING;
+  // Move down: owner's safeBox top must clear other's safeBox bottom
+  // owner.safeBox.y = owner.bbox.y - SAFE_PADDING, so:
+  // owner.bbox.y - SAFE_PADDING >= other.safeBox.y + other.safeBox.h
+  // owner.bbox.y >= other.bbox.y + other.bbox.h + SAFE_PADDING * 2
+  const moveDownTarget = other.bbox.y + other.bbox.h + SAFE_PADDING * 2;
   const moveDownCost = Math.abs(moveDownTarget - owner.bbox.y);
 
-  // Move up: owner bottom safeBox edge clears above other top safeBox edge
+  // Move up: owner's safeBox bottom must clear above other's safeBox top
+  // owner.bbox.y + owner.bbox.h + SAFE_PADDING <= other.bbox.y - SAFE_PADDING
   const moveUpTarget = other.bbox.y - owner.bbox.h - SAFE_PADDING * 2;
   const moveUpCost = Math.abs(owner.bbox.y - moveUpTarget);
 
-  // Move right: owner.bbox.x needs to be at other.safeBox.x + other.safeBox.w - SAFE_PADDING
-  const moveRightTarget = other.safeBox.x + other.safeBox.w - SAFE_PADDING;
+  // Move right: owner's safeBox left must clear other's safeBox right
+  const moveRightTarget = other.bbox.x + other.bbox.w + SAFE_PADDING * 2;
   const moveRightCost = Math.abs(moveRightTarget - owner.bbox.x);
 
-  // Move left: owner right safeBox edge clears left of other left safeBox edge
+  // Move left: owner's safeBox right must clear other's safeBox left
   const moveLeftTarget = other.bbox.x - owner.bbox.w - SAFE_PADDING * 2;
   const moveLeftCost = Math.abs(owner.bbox.x - moveLeftTarget);
 

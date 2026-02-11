@@ -1,0 +1,1040 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>PPTAgent Visual Debug</title>
+<style>
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #1e1e2e; color: #cdd6f4; }
+#app { display: flex; flex-direction: column; height: 100vh; }
+
+#toolbar {
+  background: #181825;
+  border-bottom: 1px solid #313244;
+  padding: 8px 16px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+#toolbar h1 { font-size: 16px; color: #cba6f7; white-space: nowrap; }
+#tabs { display: flex; gap: 4px; }
+.tab {
+  background: #313244;
+  border: 1px solid #45475a;
+  color: #cdd6f4;
+  padding: 4px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.tab:hover { background: #45475a; }
+.tab.active { background: #585b70; border-color: #cba6f7; }
+.tab-badge {
+  font-size: 10px;
+  background: #45475a;
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+.tab.active .tab-badge { background: #6c7086; }
+
+#toggles {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-left: auto;
+  font-size: 12px;
+}
+#toggles label { display: flex; align-items: center; gap: 4px; cursor: pointer; white-space: nowrap; }
+.swatch {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 2px;
+  vertical-align: middle;
+}
+
+#main {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+#slide-area {
+  flex: 1;
+  overflow: auto;
+  padding: 24px;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  position: relative;
+}
+
+#slide-container {
+  position: relative;
+  flex-shrink: 0;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+  border-radius: 4px;
+  overflow: visible;
+}
+
+.iter-slide { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+.slide-base { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+.slide-base > div { position: relative; }
+.overlay-svg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  z-index: 10000;
+}
+.overlay-svg rect, .overlay-svg line, .overlay-svg circle, .overlay-svg text, .overlay-svg path, .overlay-svg polygon { pointer-events: all; }
+
+#tooltip {
+  display: none;
+  position: fixed;
+  background: #181825;
+  border: 1px solid #585b70;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 12px;
+  max-width: 280px;
+  z-index: 99999;
+  line-height: 1.5;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+}
+#tooltip hr { border: none; border-top: 1px solid #45475a; margin: 4px 0; }
+.tip-defect { color: #f38ba8; font-weight: 600; }
+
+#panel {
+  width: 360px;
+  background: #181825;
+  border-left: 1px solid #313244;
+  display: flex;
+  flex-direction: column;
+  transition: width 0.2s;
+  overflow: hidden;
+}
+#panel.collapsed { width: 0; min-width: 0; border-left: none; }
+#panel-header {
+  padding: 8px;
+  border-bottom: 1px solid #313244;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+#panel-tabs { display: flex; gap: 2px; flex: 1; }
+.panel-tab {
+  background: #313244;
+  border: 1px solid #45475a;
+  color: #cdd6f4;
+  padding: 3px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 11px;
+}
+.panel-tab:hover { background: #45475a; }
+.panel-tab.active { background: #585b70; border-color: #cba6f7; }
+#panel-header > button {
+  background: #313244;
+  border: 1px solid #45475a;
+  color: #cdd6f4;
+  padding: 3px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+}
+#panel-header > button:hover { background: #45475a; }
+#panel-content {
+  flex: 1;
+  overflow: auto;
+  padding: 12px;
+  font-size: 11px;
+  font-family: 'Cascadia Code', 'Fira Code', monospace;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  word-break: break-all;
+  color: #a6adc8;
+}
+
+/* ── Timeline ── */
+#timeline {
+  background: #181825;
+  border-bottom: 1px solid #313244;
+  padding: 6px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+#timeline-controls { display: flex; gap: 4px; align-items: center; flex-shrink: 0; }
+#timeline-controls button {
+  background: #313244;
+  border: 1px solid #45475a;
+  color: #cdd6f4;
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+#timeline-controls button:hover { background: #45475a; }
+#speed-select {
+  background: #313244;
+  border: 1px solid #45475a;
+  color: #cdd6f4;
+  padding: 2px 4px;
+  border-radius: 4px;
+  font-size: 11px;
+}
+#timeline-track {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  position: relative;
+  min-height: 28px;
+}
+#timeline-progress {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  height: 3px;
+  background: #cba6f7;
+  border-radius: 2px;
+  transition: width 0.3s ease;
+  width: 0;
+  z-index: 0;
+}
+.timeline-marker {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  font-size: 11px;
+  color: #6c7086;
+  position: relative;
+  z-index: 1;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: background 0.15s;
+}
+.timeline-marker:hover { background: #313244; }
+.timeline-marker.active { color: #cba6f7; font-weight: 600; }
+.marker-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #45475a;
+  flex-shrink: 0;
+}
+.timeline-marker.active .marker-dot { background: #cba6f7; }
+.marker-badge {
+  font-size: 9px;
+  background: #313244;
+  padding: 0 4px;
+  border-radius: 3px;
+}
+/* Taboo marker styling */
+.timeline-marker.taboo .marker-dot { background: #ef4444; }
+.timeline-marker.taboo .marker-label { text-decoration: line-through; color: #ef4444; }
+
+/* ── Animation layer ── */
+#anim-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 9999;
+  pointer-events: none;
+  display: none;
+}
+.anim-rect { position: absolute; }
+
+/* Hover-to-highlight: conflict elements on slide */
+.conflict-elem { opacity: 0.2; transition: opacity 0.15s ease; }
+.conflict-elem.active, .conflict-elem:hover { opacity: 1; }
+
+/* Hover-to-highlight: conflict panel rows */
+.conflict-panel-row { opacity: 0.6; transition: opacity 0.15s ease; }
+.conflict-panel-row.active, .conflict-panel-row:hover { opacity: 1; }
+
+/* Hover-to-highlight: defect labels */
+.defect-group { opacity: 0.25; transition: opacity 0.15s ease; }
+.defect-group.active, .defect-group:hover { opacity: 1; }
+
+/* Ensure all SVG children are hoverable */
+.conflict-elem *, .conflict-panel-row *, .defect-group * { pointer-events: all; }
+
+/* Animated marching-ants trace for movement arrows */
+@keyframes marchingAnts { to { stroke-dashoffset: -16; } }
+.move-trace { stroke-dasharray: 10 6; animation: marchingAnts 0.5s linear infinite; }
+
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="toolbar">
+    <h1>PPTAgent Visual Debug</h1>
+    <div id="tabs">
+      <button class="tab active" data-iter="0" onclick="switchIter(0)">Iter 0 (initial)<span class="tab-badge">1D / 1W</span></button>
+      <button class="tab" data-iter="1" onclick="switchIter(1)">Iter 1<span class="tab-badge">0D / 1W</span></button>
+    </div>
+    <div id="toggles">
+      <label style="font-weight:bold;border-right:1px solid #cbd5e1;padding-right:8px;margin-right:4px"><input type="checkbox" checked id="toggle-invert" onchange="invertAll()"> all</label>
+      <label><input type="checkbox" checked data-layer="bbox" onchange="toggleLayer('bbox', this.checked)"> <span class="swatch" style="border:2px solid #3b82f6"></span> bbox</label>
+      <label><input type="checkbox" checked data-layer="safebox" onchange="toggleLayer('safebox', this.checked)"> <span class="swatch" style="border:2px dashed #8b5cf6"></span> safeBox</label>
+      <label><input type="checkbox" checked data-layer="contentbox" onchange="toggleLayer('contentbox', this.checked)"> <span class="swatch" style="border:2px dotted #22c55e"></span> contentBox</label>
+      <label><input type="checkbox" checked data-layer="overlap" onchange="toggleLayer('overlap', this.checked)"> <span class="swatch" style="background:rgba(239,68,68,0.25)"></span> overlaps</label>
+      <label><input type="checkbox" checked data-layer="oob" onchange="toggleLayer('oob', this.checked)"> <span class="swatch" style="border:2px solid #ef4444"></span> out of bounds</label>
+      <label><input type="checkbox" checked data-layer="badge" onchange="toggleLayer('badge', this.checked)"> <span class="swatch" style="background:#dc2626;color:#fff;font-size:9px;padding:0 3px">!</span> defect labels</label>
+      <label><input type="checkbox" checked data-layer="hint" onchange="toggleLayer('hint', this.checked)"> <span class="swatch" style="border:2px dashed #22c55e"></span> hints</label>
+      <label><input type="checkbox" checked data-layer="conflict" onchange="toggleLayer('conflict', this.checked)"> <span class="swatch" style="border:2px solid #f59e0b"></span> conflicts</label>
+      <label><input type="checkbox" checked data-layer="diff" onchange="toggleLayer('diff', this.checked)"> <span class="swatch" style="border:2px solid #a78bfa"></span> diff</label>
+    </div>
+  </div>
+  <div id="timeline">
+    <div id="timeline-controls">
+      <button id="btn-step-back" onclick="stepBack()" title="Previous (←)">◁</button>
+      <button id="btn-play" onclick="togglePlay()" title="Play/Pause (Space)">▶</button>
+      <button id="btn-step-fwd" onclick="stepForward()" title="Next (→)">▷</button>
+      <select id="speed-select" onchange="setSpeed(+this.value)">
+        <option value="500">0.5s</option>
+        <option value="1000" selected>1s</option>
+        <option value="2000">2s</option>
+      </select>
+    </div>
+    <div id="timeline-track">
+      <div id="timeline-progress"></div>
+      <div class="timeline-marker active" data-idx="0" onclick="jumpTo(0)" title="Iter 0">
+          <span class="marker-dot"></span>
+          <span class="marker-label">Iter 0</span>
+          <span class="marker-badge">1D</span>
+        </div>
+      <div class="timeline-marker" data-idx="1" onclick="jumpTo(1)" title="Iter 1">
+          <span class="marker-dot"></span>
+          <span class="marker-label">Iter 1</span>
+          <span class="marker-badge">0D</span>
+        </div>
+    </div>
+  </div>
+  <div id="main">
+    <div id="slide-area">
+      <div id="slide-container" style="width:1280px;height:720px;">
+        <div class="iter-slide" data-iter="0" style="display:block">
+          <div class="slide-base"><div id="slide">
+    <div data-eid="e_panel" style="position: absolute; box-sizing: border-box; left: 0px; top: 0px; width: 1280px; height: 720px; z-index: 0; overflow: visible; font-size: 16px; line-height: 1.2; background-color: rgb(250, 250, 250)"></div>
+    <div data-eid="e_accent" style="position: absolute; box-sizing: border-box; left: 0px; top: 0px; width: 12px; height: 720px; z-index: 1; overflow: visible; font-size: 16px; line-height: 1.2; background-color: rgb(37, 99, 235)"></div>
+    <div data-eid="e_title" style="position: absolute; box-sizing: border-box; left: 40px; top: 28px; width: 1200px; height: 50px; z-index: 0; overflow: visible; font-size: 42px; line-height: 1.2; color: rgb(30, 41, 59); font-weight: 700">
+        Team Performance Q3 2025
+      </div>
+    <div data-eid="e_subtitle" style="position: absolute; box-sizing: border-box; left: 40px; top: 90px; width: 1200px; height: 23px; z-index: 0; overflow: visible; font-size: 18px; line-height: 1.3; color: rgb(100, 116, 139)">
+        Engineering &amp; Product Division — Confidential
+      </div>
+    <div data-eid="e_metrics" style="position: absolute; box-sizing: border-box; left: 40px; top: 138px; width: 560px; height: 416px; z-index: 0; overflow: visible; font-size: 20px; line-height: 1.55; color: rgb(51, 65, 85)">
+          <ul style="margin: 0; padding-left: 1.5em; list-style-type: disc;">
+            <li>Sprint velocity increased 34% (82 → 110 pts/sprint)</li>
+            <li>Deployment frequency: 12/week → 23/week (+92%)</li>
+            <li>Mean time to recovery improved from 4.2h to 1.1h</li>
+            <li>Customer-reported P0 bugs down 67% quarter-over-quarter</li>
+            <li>Code review turnaround reduced from 18h to 6h median</li>
+            <li>Test coverage expanded from 72% to 89% across all repos</li>
+            <li>On-call pages reduced 41% after reliability initiatives</li>
+            <li>3 major feature launches shipped ahead of schedule</li>
+          </ul>
+        </div>
+    <div data-eid="e_photo1" style="position: absolute; box-sizing: border-box; left: 640px; top: 138px; width: 280px; height: 200px; z-index: 0; overflow: visible; font-size: 16px; line-height: 1.2; border-radius: 8px">
+            <img src="https://via.placeholder.com/280x200/e2e8f0/475569?text=Team+Alpha" style="width: 100%; height: 100%; object-fit: contain;" alt="">
+          </div>
+    <div data-eid="e_photo2" style="position: absolute; box-sizing: border-box; left: 640px; top: 354px; width: 280px; height: 200px; z-index: 0; overflow: visible; font-size: 16px; line-height: 1.2; border-radius: 8px">
+            <img src="https://via.placeholder.com/280x200/e2e8f0/475569?text=Team+Beta" style="width: 100%; height: 100%; object-fit: contain;" alt="">
+          </div>
+    <div data-eid="e_callout" style="position: absolute; box-sizing: border-box; left: 640px; top: 564px; width: 600px; height: 104px; z-index: 20; overflow: visible; font-size: 16px; line-height: 1.5; color: rgb(30, 64, 175); background-color: rgb(239, 246, 255); border-radius: 8px">
+      Key Insight: Cross-team pairing sessions drove the largest single improvement in review turnaround. Teams that adopted the practice saw 3× faster PR merge times compared to control group.
+    </div>
+    <div data-eid="e_source" style="position: absolute; box-sizing: border-box; left: 40px; top: 687px; width: 583px; height: 21px; z-index: 0; overflow: visible; font-size: 16px; line-height: 1.3; color: rgb(148, 163, 184)">
+      Source: Engineering Metrics Dashboard · Internal Use Only · Updated 2025-10-01
+    </div>
+  </div></div>
+          <svg class="overlay-svg" width="1280" height="720" viewBox="0 0 1280 720">
+            <defs>
+              <marker id="diff-arrow-g" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#22c55e" /></marker>
+              <marker id="diff-arrow-r" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#ef4444" /></marker>
+            </defs>
+            <defs><marker id="overflow-arrow" markerWidth="6" markerHeight="5" refX="6" refY="2.5" orient="auto"><polygon points="0 0, 6 2.5, 0 5" fill="#ef4444" /></marker></defs><rect data-layer="bbox" data-eid="e_panel" x="0" y="0" width="1280" height="720" fill="none" stroke="#3b82f6" stroke-width="1" pointer-events="all" />
+            <rect data-layer="safebox" data-eid="e_panel" x="-8" y="-8" width="1296" height="736" fill="none" stroke="#8b5cf6" stroke-width="1" stroke-dasharray="4,3" pointer-events="all" />
+            <rect data-layer="bbox" data-eid="e_accent" x="0" y="0" width="12" height="720" fill="none" stroke="#3b82f6" stroke-width="1" pointer-events="all" />
+            <rect data-layer="safebox" data-eid="e_accent" x="-8" y="-8" width="28" height="736" fill="none" stroke="#8b5cf6" stroke-width="1" stroke-dasharray="4,3" pointer-events="all" />
+            <rect data-layer="bbox" data-eid="e_title" x="40" y="28" width="1200" height="50" fill="none" stroke="#3b82f6" stroke-width="1" pointer-events="all" />
+            <rect data-layer="safebox" data-eid="e_title" x="32" y="20" width="1216" height="66" fill="none" stroke="#8b5cf6" stroke-width="1" stroke-dasharray="4,3" pointer-events="all" />
+            <rect data-layer="contentbox" data-eid="e_title" x="40" y="29" width="547.859375" height="47" fill="none" stroke="#22c55e" stroke-width="1" stroke-dasharray="2,2" pointer-events="all" />
+            <rect data-layer="bbox" data-eid="e_subtitle" x="40" y="90" width="1200" height="23" fill="none" stroke="#3b82f6" stroke-width="1" pointer-events="all" />
+            <rect data-layer="safebox" data-eid="e_subtitle" x="32" y="82" width="1216" height="39" fill="none" stroke="#8b5cf6" stroke-width="1" stroke-dasharray="4,3" pointer-events="all" />
+            <rect data-layer="contentbox" data-eid="e_subtitle" x="40" y="91" width="371.203125" height="20" fill="none" stroke="#22c55e" stroke-width="1" stroke-dasharray="2,2" pointer-events="all" />
+            <rect data-layer="bbox" data-eid="e_metrics" x="40" y="138" width="560" height="416" fill="none" stroke="#3b82f6" stroke-width="1" pointer-events="all" />
+            <rect data-layer="safebox" data-eid="e_metrics" x="32" y="130" width="576" height="432" fill="none" stroke="#8b5cf6" stroke-width="1" stroke-dasharray="4,3" pointer-events="all" />
+            <rect data-layer="contentbox" data-eid="e_metrics" x="40" y="138" width="560" height="279" fill="none" stroke="#22c55e" stroke-width="1" stroke-dasharray="2,2" pointer-events="all" />
+            <rect data-layer="bbox" data-eid="e_photo1" x="640" y="138" width="280" height="200" fill="none" stroke="#3b82f6" stroke-width="1" pointer-events="all" />
+            <rect data-layer="safebox" data-eid="e_photo1" x="632" y="130" width="296" height="216" fill="none" stroke="#8b5cf6" stroke-width="1" stroke-dasharray="4,3" pointer-events="all" />
+            <rect data-layer="contentbox" data-eid="e_photo1" x="640" y="138" width="280" height="200" fill="none" stroke="#22c55e" stroke-width="1" stroke-dasharray="2,2" pointer-events="all" />
+            <rect data-layer="bbox" data-eid="e_photo2" x="640" y="354" width="280" height="200" fill="none" stroke="#3b82f6" stroke-width="1" pointer-events="all" />
+            <rect data-layer="safebox" data-eid="e_photo2" x="632" y="346" width="296" height="216" fill="none" stroke="#8b5cf6" stroke-width="1" stroke-dasharray="4,3" pointer-events="all" />
+            <rect data-layer="contentbox" data-eid="e_photo2" x="640" y="354" width="280" height="200" fill="none" stroke="#22c55e" stroke-width="1" stroke-dasharray="2,2" pointer-events="all" />
+            <rect data-layer="bbox" data-eid="e_callout" x="640" y="564" width="600" height="104" fill="none" stroke="#3b82f6" stroke-width="1" pointer-events="all" />
+            <rect data-layer="safebox" data-eid="e_callout" x="632" y="556" width="616" height="120" fill="none" stroke="#8b5cf6" stroke-width="1" stroke-dasharray="4,3" pointer-events="all" />
+            <rect data-layer="contentbox" data-eid="e_callout" x="640" y="567" width="583.5625" height="65" fill="none" stroke="#22c55e" stroke-width="1" stroke-dasharray="2,2" pointer-events="all" />
+            <rect data-layer="bbox" data-eid="e_source" x="40" y="687" width="583" height="21" fill="none" stroke="#3b82f6" stroke-width="1" pointer-events="all" />
+            <rect data-layer="safebox" data-eid="e_source" x="32" y="679" width="599" height="37" fill="none" stroke="#8b5cf6" stroke-width="1" stroke-dasharray="4,3" pointer-events="all" />
+            <rect data-layer="contentbox" data-eid="e_source" x="40" y="688" width="582.53125" height="17" fill="none" stroke="#22c55e" stroke-width="1" stroke-dasharray="2,2" pointer-events="all" />
+            <rect data-layer="overlap" x="32" y="82" width="1216" height="4" fill="rgba(239,68,68,0.25)" stroke="none" stroke-width="0" pointer-events="all" />
+            <g class="defect-group" data-layer="badge" data-defect-eid="e_subtitle">
+            <rect x="39" y="89" width="1202" height="25" fill="none" stroke="#ef4444" stroke-width="2.5" stroke-dasharray="6,3" />
+            <line x1="1240" y1="99" x2="1260" y2="99" stroke="#ea580c" stroke-width="1" stroke-dasharray="3,2" />
+            <rect x="1260" y="90" width="181" height="18" rx="3" fill="#ea580c" opacity="0.92" /><text x="1266" y="103" fill="white" font-size="11" font-family="system-ui, sans-serif">overlap vs e_title 4864px²</text>
+            <rect x="32" y="82" width="1216" height="4" fill="rgba(239,68,68,0.3)" stroke="#ef4444" stroke-width="1.5" />
+            <line x1="32" y1="82" x2="32" y2="82" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="40" y1="82" x2="36" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="48" y1="82" x2="44" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="56" y1="82" x2="52" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="64" y1="82" x2="60" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="72" y1="82" x2="68" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="80" y1="82" x2="76" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="88" y1="82" x2="84" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="96" y1="82" x2="92" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="104" y1="82" x2="100" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="112" y1="82" x2="108" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="120" y1="82" x2="116" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="128" y1="82" x2="124" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="136" y1="82" x2="132" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="144" y1="82" x2="140" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="152" y1="82" x2="148" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="160" y1="82" x2="156" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="168" y1="82" x2="164" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="176" y1="82" x2="172" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="184" y1="82" x2="180" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="192" y1="82" x2="188" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="200" y1="82" x2="196" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="208" y1="82" x2="204" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="216" y1="82" x2="212" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="224" y1="82" x2="220" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="232" y1="82" x2="228" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="240" y1="82" x2="236" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="248" y1="82" x2="244" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="256" y1="82" x2="252" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="264" y1="82" x2="260" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="272" y1="82" x2="268" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="280" y1="82" x2="276" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="288" y1="82" x2="284" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="296" y1="82" x2="292" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="304" y1="82" x2="300" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="312" y1="82" x2="308" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="320" y1="82" x2="316" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="328" y1="82" x2="324" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="336" y1="82" x2="332" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="344" y1="82" x2="340" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="352" y1="82" x2="348" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="360" y1="82" x2="356" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="368" y1="82" x2="364" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="376" y1="82" x2="372" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="384" y1="82" x2="380" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="392" y1="82" x2="388" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="400" y1="82" x2="396" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="408" y1="82" x2="404" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="416" y1="82" x2="412" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="424" y1="82" x2="420" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="432" y1="82" x2="428" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="440" y1="82" x2="436" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="448" y1="82" x2="444" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="456" y1="82" x2="452" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="464" y1="82" x2="460" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="472" y1="82" x2="468" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="480" y1="82" x2="476" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="488" y1="82" x2="484" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="496" y1="82" x2="492" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="504" y1="82" x2="500" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="512" y1="82" x2="508" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="520" y1="82" x2="516" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="528" y1="82" x2="524" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="536" y1="82" x2="532" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="544" y1="82" x2="540" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="552" y1="82" x2="548" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="560" y1="82" x2="556" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="568" y1="82" x2="564" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="576" y1="82" x2="572" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="584" y1="82" x2="580" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="592" y1="82" x2="588" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="600" y1="82" x2="596" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="608" y1="82" x2="604" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="616" y1="82" x2="612" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="624" y1="82" x2="620" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="632" y1="82" x2="628" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="640" y1="82" x2="636" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="648" y1="82" x2="644" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="656" y1="82" x2="652" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="664" y1="82" x2="660" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="672" y1="82" x2="668" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="680" y1="82" x2="676" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="688" y1="82" x2="684" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="696" y1="82" x2="692" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="704" y1="82" x2="700" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="712" y1="82" x2="708" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="720" y1="82" x2="716" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="728" y1="82" x2="724" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="736" y1="82" x2="732" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="744" y1="82" x2="740" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="752" y1="82" x2="748" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="760" y1="82" x2="756" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="768" y1="82" x2="764" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="776" y1="82" x2="772" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="784" y1="82" x2="780" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="792" y1="82" x2="788" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="800" y1="82" x2="796" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="808" y1="82" x2="804" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="816" y1="82" x2="812" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="824" y1="82" x2="820" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="832" y1="82" x2="828" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="840" y1="82" x2="836" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="848" y1="82" x2="844" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="856" y1="82" x2="852" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="864" y1="82" x2="860" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="872" y1="82" x2="868" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="880" y1="82" x2="876" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="888" y1="82" x2="884" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="896" y1="82" x2="892" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="904" y1="82" x2="900" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="912" y1="82" x2="908" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="920" y1="82" x2="916" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="928" y1="82" x2="924" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="936" y1="82" x2="932" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="944" y1="82" x2="940" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="952" y1="82" x2="948" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="960" y1="82" x2="956" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="968" y1="82" x2="964" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="976" y1="82" x2="972" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="984" y1="82" x2="980" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="992" y1="82" x2="988" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="1000" y1="82" x2="996" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="1008" y1="82" x2="1004" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="1016" y1="82" x2="1012" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="1024" y1="82" x2="1020" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="1032" y1="82" x2="1028" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="1040" y1="82" x2="1036" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="1048" y1="82" x2="1044" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="1056" y1="82" x2="1052" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="1064" y1="82" x2="1060" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="1072" y1="82" x2="1068" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="1080" y1="82" x2="1076" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="1088" y1="82" x2="1084" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="1096" y1="82" x2="1092" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="1104" y1="82" x2="1100" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="1112" y1="82" x2="1108" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="1120" y1="82" x2="1116" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="1128" y1="82" x2="1124" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="1136" y1="82" x2="1132" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="1144" y1="82" x2="1140" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="1152" y1="82" x2="1148" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="1160" y1="82" x2="1156" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="1168" y1="82" x2="1164" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="1176" y1="82" x2="1172" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="1184" y1="82" x2="1180" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="1192" y1="82" x2="1188" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="1200" y1="82" x2="1196" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="1208" y1="82" x2="1204" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="1216" y1="82" x2="1212" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="1224" y1="82" x2="1220" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="1232" y1="82" x2="1228" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="1240" y1="82" x2="1236" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <line x1="1248" y1="82" x2="1244" y2="86" stroke="#ef4444" stroke-width="0.7" opacity="0.5" />
+            <rect x="39" y="27" width="1202" height="52" fill="none" stroke="#f97316" stroke-width="1.5" stroke-dasharray="5,3" />
+            <rect x="622" y="69.25" width="36" height="16" rx="3" fill="#ef4444" opacity="0.85" /><text x="640" y="81.25" fill="white" font-size="9" font-weight="bold" font-family="system-ui, sans-serif" text-anchor="middle">overlap</text>
+            </g>
+            <rect data-layer="hint" data-eid="e_subtitle" x="40" y="94" width="1200" height="23" fill="rgba(34,197,94,0.1)" stroke="#22c55e" stroke-width="2" stroke-dasharray="6,3" pointer-events="all" />
+            <g data-layer="conflict"><rect x="16" y="612" width="508" height="92" rx="8" fill="rgba(15,15,25,0.92)" stroke="#f59e0b" stroke-width="1.5" /></g>
+            <g data-layer="conflict"><text x="30" y="634" fill="#f59e0b" font-size="13" font-weight="bold" font-family="system-ui, sans-serif">Conflict group (2 elements, 1 edges)</text><line x1="30" y1="640" x2="510" y2="640" stroke="#f59e0b" stroke-width="0.5" opacity="0.4" /></g>
+            <g class="conflict-panel-row" data-conflict-eid="e_subtitle" data-layer="conflict"><rect x="20" y="652" width="500" height="22" fill="transparent" /><text x="30" y="664" fill="#e2e8f0" font-size="11" font-family="'Cascadia Code', 'Fira Code', monospace">e_subtitle → e_title: down 4px (or: up 101px, right 1216px, left 1216px)</text></g>
+            <g data-layer="conflict"><text x="30" y="686" fill="#94a3b8" font-size="10" font-family="'Cascadia Code', 'Fira Code', monospace">Space: e_subtitle ↑82 ↓9 ←32 →32 | e_title ↑20 ↓44 ←32 →32</text></g>
+            <g class="conflict-elem" data-conflict-eid="e_subtitle" data-layer="conflict"><line x1="640" y1="101.5" x2="640" y2="53" stroke="#f59e0b" stroke-width="2" stroke-dasharray="6,4" opacity="0.7" /></g>
+            <g class="conflict-elem" data-conflict-eid="e_subtitle" data-layer="conflict">
+            <line x1="640" y1="90" x2="640" y2="78" stroke="#22c55e" stroke-width="1.5" /><polygon points="637,82 643,82 640,78" fill="#22c55e" />
+            <line x1="640" y1="113" x2="640" y2="122" stroke="#22c55e" stroke-width="1.5" /><polygon points="637,118 643,118 640,122" fill="#22c55e" />
+            <line x1="40" y1="101.5" x2="28" y2="101.5" stroke="#22c55e" stroke-width="1.5" /><polygon points="32,98.5 32,104.5 28,101.5" fill="#22c55e" />
+            <line x1="1240" y1="101.5" x2="1252" y2="101.5" stroke="#22c55e" stroke-width="1.5" /><polygon points="1248,98.5 1248,104.5 1252,101.5" fill="#22c55e" />
+            </g>
+            <g class="conflict-elem" data-conflict-eid="e_title" data-layer="conflict">
+            <line x1="640" y1="28" x2="640" y2="16" stroke="#22c55e" stroke-width="1.5" /><polygon points="637,20 643,20 640,16" fill="#22c55e" />
+            <line x1="640" y1="78" x2="640" y2="90" stroke="#22c55e" stroke-width="1.5" /><polygon points="637,86 643,86 640,90" fill="#22c55e" />
+            <line x1="40" y1="53" x2="28" y2="53" stroke="#22c55e" stroke-width="1.5" /><polygon points="32,50 32,56 28,53" fill="#22c55e" />
+            <line x1="1240" y1="53" x2="1252" y2="53" stroke="#22c55e" stroke-width="1.5" /><polygon points="1248,50 1248,56 1252,53" fill="#22c55e" />
+            </g>
+          </svg>
+        </div>
+        <div class="iter-slide" data-iter="1" style="display:none">
+          <div class="slide-base"><div id="slide">
+    <div data-eid="e_panel" style="position: absolute; box-sizing: border-box; left: 0px; top: 0px; width: 1280px; height: 720px; z-index: 0; overflow: visible; font-size: 16px; line-height: 1.2; background-color: rgb(250, 250, 250)"></div>
+    <div data-eid="e_accent" style="position: absolute; box-sizing: border-box; left: 0px; top: 0px; width: 12px; height: 720px; z-index: 1; overflow: visible; font-size: 16px; line-height: 1.2; background-color: rgb(37, 99, 235)"></div>
+    <div data-eid="e_title" style="position: absolute; box-sizing: border-box; left: 40px; top: 28px; width: 1200px; height: 50px; z-index: 0; overflow: visible; font-size: 42px; line-height: 1.2; color: rgb(30, 41, 59); font-weight: 700">
+        Team Performance Q3 2025
+      </div>
+    <div data-eid="e_subtitle" style="position: absolute; box-sizing: border-box; left: 40px; top: 94px; width: 1200px; height: 23px; z-index: 0; overflow: visible; font-size: 18px; line-height: 1.3; color: rgb(100, 116, 139)">
+        Engineering &amp; Product Division — Confidential
+      </div>
+    <div data-eid="e_metrics" style="position: absolute; box-sizing: border-box; left: 40px; top: 138px; width: 560px; height: 416px; z-index: 0; overflow: visible; font-size: 20px; line-height: 1.55; color: rgb(51, 65, 85)">
+          <ul style="margin: 0; padding-left: 1.5em; list-style-type: disc;">
+            <li>Sprint velocity increased 34% (82 → 110 pts/sprint)</li>
+            <li>Deployment frequency: 12/week → 23/week (+92%)</li>
+            <li>Mean time to recovery improved from 4.2h to 1.1h</li>
+            <li>Customer-reported P0 bugs down 67% quarter-over-quarter</li>
+            <li>Code review turnaround reduced from 18h to 6h median</li>
+            <li>Test coverage expanded from 72% to 89% across all repos</li>
+            <li>On-call pages reduced 41% after reliability initiatives</li>
+            <li>3 major feature launches shipped ahead of schedule</li>
+          </ul>
+        </div>
+    <div data-eid="e_photo1" style="position: absolute; box-sizing: border-box; left: 640px; top: 138px; width: 280px; height: 200px; z-index: 0; overflow: visible; font-size: 16px; line-height: 1.2; border-radius: 8px">
+            <img src="https://via.placeholder.com/280x200/e2e8f0/475569?text=Team+Alpha" style="width: 100%; height: 100%; object-fit: contain;" alt="">
+          </div>
+    <div data-eid="e_photo2" style="position: absolute; box-sizing: border-box; left: 640px; top: 354px; width: 280px; height: 200px; z-index: 0; overflow: visible; font-size: 16px; line-height: 1.2; border-radius: 8px">
+            <img src="https://via.placeholder.com/280x200/e2e8f0/475569?text=Team+Beta" style="width: 100%; height: 100%; object-fit: contain;" alt="">
+          </div>
+    <div data-eid="e_callout" style="position: absolute; box-sizing: border-box; left: 640px; top: 564px; width: 600px; height: 104px; z-index: 20; overflow: visible; font-size: 16px; line-height: 1.5; color: rgb(30, 64, 175); background-color: rgb(239, 246, 255); border-radius: 8px">
+      Key Insight: Cross-team pairing sessions drove the largest single improvement in review turnaround. Teams that adopted the practice saw 3× faster PR merge times compared to control group.
+    </div>
+    <div data-eid="e_source" style="position: absolute; box-sizing: border-box; left: 40px; top: 687px; width: 583px; height: 21px; z-index: 0; overflow: visible; font-size: 16px; line-height: 1.3; color: rgb(148, 163, 184)">
+      Source: Engineering Metrics Dashboard · Internal Use Only · Updated 2025-10-01
+    </div>
+  </div></div>
+          <svg class="overlay-svg" width="1280" height="720" viewBox="0 0 1280 720">
+            <defs>
+              <marker id="diff-arrow-g" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#22c55e" /></marker>
+              <marker id="diff-arrow-r" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#ef4444" /></marker>
+            </defs>
+            <defs><marker id="overflow-arrow" markerWidth="6" markerHeight="5" refX="6" refY="2.5" orient="auto"><polygon points="0 0, 6 2.5, 0 5" fill="#ef4444" /></marker></defs><rect data-layer="bbox" data-eid="e_panel" x="0" y="0" width="1280" height="720" fill="none" stroke="#3b82f6" stroke-width="1" pointer-events="all" />
+            <rect data-layer="safebox" data-eid="e_panel" x="-8" y="-8" width="1296" height="736" fill="none" stroke="#8b5cf6" stroke-width="1" stroke-dasharray="4,3" pointer-events="all" />
+            <rect data-layer="bbox" data-eid="e_accent" x="0" y="0" width="12" height="720" fill="none" stroke="#3b82f6" stroke-width="1" pointer-events="all" />
+            <rect data-layer="safebox" data-eid="e_accent" x="-8" y="-8" width="28" height="736" fill="none" stroke="#8b5cf6" stroke-width="1" stroke-dasharray="4,3" pointer-events="all" />
+            <rect data-layer="bbox" data-eid="e_title" x="40" y="28" width="1200" height="50" fill="none" stroke="#3b82f6" stroke-width="1" pointer-events="all" />
+            <rect data-layer="safebox" data-eid="e_title" x="32" y="20" width="1216" height="66" fill="none" stroke="#8b5cf6" stroke-width="1" stroke-dasharray="4,3" pointer-events="all" />
+            <rect data-layer="contentbox" data-eid="e_title" x="40" y="29" width="547.859375" height="47" fill="none" stroke="#22c55e" stroke-width="1" stroke-dasharray="2,2" pointer-events="all" />
+            <rect data-layer="bbox" data-eid="e_subtitle" x="40" y="94" width="1200" height="23" fill="none" stroke="#3b82f6" stroke-width="1" pointer-events="all" />
+            <rect data-layer="safebox" data-eid="e_subtitle" x="32" y="86" width="1216" height="39" fill="none" stroke="#8b5cf6" stroke-width="1" stroke-dasharray="4,3" pointer-events="all" />
+            <rect data-layer="contentbox" data-eid="e_subtitle" x="40" y="95" width="371.203125" height="20" fill="none" stroke="#22c55e" stroke-width="1" stroke-dasharray="2,2" pointer-events="all" />
+            <rect data-layer="bbox" data-eid="e_metrics" x="40" y="138" width="560" height="416" fill="none" stroke="#3b82f6" stroke-width="1" pointer-events="all" />
+            <rect data-layer="safebox" data-eid="e_metrics" x="32" y="130" width="576" height="432" fill="none" stroke="#8b5cf6" stroke-width="1" stroke-dasharray="4,3" pointer-events="all" />
+            <rect data-layer="contentbox" data-eid="e_metrics" x="40" y="138" width="560" height="279" fill="none" stroke="#22c55e" stroke-width="1" stroke-dasharray="2,2" pointer-events="all" />
+            <rect data-layer="bbox" data-eid="e_photo1" x="640" y="138" width="280" height="200" fill="none" stroke="#3b82f6" stroke-width="1" pointer-events="all" />
+            <rect data-layer="safebox" data-eid="e_photo1" x="632" y="130" width="296" height="216" fill="none" stroke="#8b5cf6" stroke-width="1" stroke-dasharray="4,3" pointer-events="all" />
+            <rect data-layer="contentbox" data-eid="e_photo1" x="640" y="138" width="280" height="200" fill="none" stroke="#22c55e" stroke-width="1" stroke-dasharray="2,2" pointer-events="all" />
+            <rect data-layer="bbox" data-eid="e_photo2" x="640" y="354" width="280" height="200" fill="none" stroke="#3b82f6" stroke-width="1" pointer-events="all" />
+            <rect data-layer="safebox" data-eid="e_photo2" x="632" y="346" width="296" height="216" fill="none" stroke="#8b5cf6" stroke-width="1" stroke-dasharray="4,3" pointer-events="all" />
+            <rect data-layer="contentbox" data-eid="e_photo2" x="640" y="354" width="280" height="200" fill="none" stroke="#22c55e" stroke-width="1" stroke-dasharray="2,2" pointer-events="all" />
+            <rect data-layer="bbox" data-eid="e_callout" x="640" y="564" width="600" height="104" fill="none" stroke="#3b82f6" stroke-width="1" pointer-events="all" />
+            <rect data-layer="safebox" data-eid="e_callout" x="632" y="556" width="616" height="120" fill="none" stroke="#8b5cf6" stroke-width="1" stroke-dasharray="4,3" pointer-events="all" />
+            <rect data-layer="contentbox" data-eid="e_callout" x="640" y="567" width="583.5625" height="65" fill="none" stroke="#22c55e" stroke-width="1" stroke-dasharray="2,2" pointer-events="all" />
+            <rect data-layer="bbox" data-eid="e_source" x="40" y="687" width="583" height="21" fill="none" stroke="#3b82f6" stroke-width="1" pointer-events="all" />
+            <rect data-layer="safebox" data-eid="e_source" x="32" y="679" width="599" height="37" fill="none" stroke="#8b5cf6" stroke-width="1" stroke-dasharray="4,3" pointer-events="all" />
+            <rect data-layer="contentbox" data-eid="e_source" x="40" y="688" width="582.53125" height="17" fill="none" stroke="#22c55e" stroke-width="1" stroke-dasharray="2,2" pointer-events="all" /><g data-layer="diff">
+            <rect x="40" y="90" width="1200" height="23" fill="none" stroke="#22c55e" stroke-width="1.5" stroke-dasharray="4,3" opacity="0.5" />
+            <line x1="640" y1="101.5" x2="640" y2="105.5" stroke="#22c55e" stroke-width="2" marker-end="url(#diff-arrow-g)" />
+            <rect x="646" y="87.5" width="108" height="14" rx="2" fill="rgba(15,15,25,0.8)" /><rect x="646" y="87.5" width="46" height="14" rx="2" fill="#a78bfa" /><text x="649" y="98.5" fill="white" font-size="9" font-weight="bold" font-family="system-ui, sans-serif">ACTUAL</text><text x="697" y="98.5" fill="#22c55e" font-size="10" font-family="system-ui, sans-serif">y: 90→94</text>
+            </g>
+          </svg>
+        </div>
+        <div id="anim-layer"></div>
+      </div>
+      <div id="tooltip"></div>
+    </div>
+    <div id="panel">
+      <div id="panel-header">
+        <div id="panel-tabs">
+          <button class="panel-tab active" data-ptab="diag" onclick="switchPanelTab('diag')">Diagnostics</button>
+          <button class="panel-tab" data-ptab="patch" onclick="switchPanelTab('patch')">Patch</button>
+          <button class="panel-tab" data-ptab="overrides" onclick="switchPanelTab('overrides')">Overrides</button>
+        </div>
+        <button onclick="togglePanel()" style="margin-left:auto;flex-shrink:0">✕</button>
+      </div>
+      <pre id="panel-content">{
+  &quot;defects&quot;: [
+    {
+      &quot;type&quot;: &quot;overlap&quot;,
+      &quot;owner_eid&quot;: &quot;e_subtitle&quot;,
+      &quot;other_eid&quot;: &quot;e_title&quot;,
+      &quot;severity&quot;: 9728,
+      &quot;details&quot;: {
+        &quot;overlap_area_px&quot;: 4864,
+        &quot;severity_note&quot;: &quot;×2 (text involved)&quot;
+      },
+      &quot;hint&quot;: {
+        &quot;action&quot;: &quot;move_down&quot;,
+        &quot;validated&quot;: true,
+        &quot;target_eid&quot;: &quot;e_subtitle&quot;,
+        &quot;reason&quot;: &quot;clear e_title safeBox edge&quot;,
+        &quot;suggested_y&quot;: 94
+      }
+    }
+  ],
+  &quot;warnings&quot;: [
+    {
+      &quot;type&quot;: &quot;occlusion_suspected&quot;,
+      &quot;owner_eid&quot;: &quot;e_photo2&quot;,
+      &quot;other_eid&quot;: &quot;e_callout&quot;,
+      &quot;details&quot;: {
+        &quot;overlap_area_px&quot;: 1776,
+        &quot;top_eid&quot;: &quot;e_callout&quot;
+      }
+    }
+  ],
+  &quot;summary&quot;: {
+    &quot;defect_count&quot;: 1,
+    &quot;total_severity&quot;: 9728,
+    &quot;warning_count&quot;: 1,
+    &quot;warning_severity&quot;: 1776,
+    &quot;conflict_graph&quot;: [
+      {
+        &quot;eids&quot;: [
+          &quot;e_subtitle&quot;,
+          &quot;e_title&quot;
+        ],
+        &quot;edges&quot;: [
+          {
+            &quot;owner_eid&quot;: &quot;e_subtitle&quot;,
+            &quot;other_eid&quot;: &quot;e_title&quot;,
+            &quot;overlap_area&quot;: 4864,
+            &quot;separations&quot;: [
+              {
+                &quot;direction&quot;: &quot;move_down&quot;,
+                &quot;target_y&quot;: 94,
+                &quot;cost_px&quot;: 4
+              },
+              {
+                &quot;direction&quot;: &quot;move_up&quot;,
+                &quot;target_y&quot;: -11,
+                &quot;cost_px&quot;: 101
+              },
+              {
+                &quot;direction&quot;: &quot;move_right&quot;,
+                &quot;target_x&quot;: 1256,
+                &quot;cost_px&quot;: 1216
+              },
+              {
+                &quot;direction&quot;: &quot;move_left&quot;,
+                &quot;target_x&quot;: -1176,
+                &quot;cost_px&quot;: 1216
+              }
+            ]
+          }
+        ],
+        &quot;envelopes&quot;: [
+          {
+            &quot;eid&quot;: &quot;e_subtitle&quot;,
+            &quot;free_top&quot;: 82,
+            &quot;free_bottom&quot;: 9,
+            &quot;free_left&quot;: 32,
+            &quot;free_right&quot;: 32
+          },
+          {
+            &quot;eid&quot;: &quot;e_title&quot;,
+            &quot;free_top&quot;: 20,
+            &quot;free_bottom&quot;: 44,
+            &quot;free_left&quot;: 32,
+            &quot;free_right&quot;: 32
+          }
+        ]
+      }
+    ]
+  }
+}</pre>
+    </div>
+  </div>
+</div>
+<script>
+var iterDataMeta = [{"iter":0,"diagJSON":"{\n  \"defects\": [\n    {\n      \"type\": \"overlap\",\n      \"owner_eid\": \"e_subtitle\",\n      \"other_eid\": \"e_title\",\n      \"severity\": 9728,\n      \"details\": {\n        \"overlap_area_px\": 4864,\n        \"severity_note\": \"×2 (text involved)\"\n      },\n      \"hint\": {\n        \"action\": \"move_down\",\n        \"validated\": true,\n        \"target_eid\": \"e_subtitle\",\n        \"reason\": \"clear e_title safeBox edge\",\n        \"suggested_y\": 94\n      }\n    }\n  ],\n  \"warnings\": [\n    {\n      \"type\": \"occlusion_suspected\",\n      \"owner_eid\": \"e_photo2\",\n      \"other_eid\": \"e_callout\",\n      \"details\": {\n        \"overlap_area_px\": 1776,\n        \"top_eid\": \"e_callout\"\n      }\n    }\n  ],\n  \"summary\": {\n    \"defect_count\": 1,\n    \"total_severity\": 9728,\n    \"warning_count\": 1,\n    \"warning_severity\": 1776,\n    \"conflict_graph\": [\n      {\n        \"eids\": [\n          \"e_subtitle\",\n          \"e_title\"\n        ],\n        \"edges\": [\n          {\n            \"owner_eid\": \"e_subtitle\",\n            \"other_eid\": \"e_title\",\n            \"overlap_area\": 4864,\n            \"separations\": [\n              {\n                \"direction\": \"move_down\",\n                \"target_y\": 94,\n                \"cost_px\": 4\n              },\n              {\n                \"direction\": \"move_up\",\n                \"target_y\": -11,\n                \"cost_px\": 101\n              },\n              {\n                \"direction\": \"move_right\",\n                \"target_x\": 1256,\n                \"cost_px\": 1216\n              },\n              {\n                \"direction\": \"move_left\",\n                \"target_x\": -1176,\n                \"cost_px\": 1216\n              }\n            ]\n          }\n        ],\n        \"envelopes\": [\n          {\n            \"eid\": \"e_subtitle\",\n            \"free_top\": 82,\n            \"free_bottom\": 9,\n            \"free_left\": 32,\n            \"free_right\": 32\n          },\n          {\n            \"eid\": \"e_title\",\n            \"free_top\": 20,\n            \"free_bottom\": 44,\n            \"free_left\": 32,\n            \"free_right\": 32\n          }\n        ]\n      }\n    ]\n  }\n}","patchJSON":null,"overridesJSON":null,"elements":[{"eid":"e_panel","type":"decoration","priority":10,"defects":[],"bbox":{"x":0,"y":0,"w":1280,"h":720},"fontSize":16},{"eid":"e_accent","type":"decoration","priority":10,"defects":[],"bbox":{"x":0,"y":0,"w":12,"h":720},"fontSize":16},{"eid":"e_title","type":"title","priority":100,"defects":[],"bbox":{"x":40,"y":28,"w":1200,"h":50},"fontSize":42},{"eid":"e_subtitle","type":"text","priority":70,"defects":[{"type":"overlap","severity":9728}],"bbox":{"x":40,"y":90,"w":1200,"h":23},"fontSize":18},{"eid":"e_metrics","type":"bullets","priority":80,"defects":[],"bbox":{"x":40,"y":138,"w":560,"h":416},"fontSize":15},{"eid":"e_photo1","type":"image","priority":40,"defects":[],"bbox":{"x":640,"y":138,"w":280,"h":200},"fontSize":16},{"eid":"e_photo2","type":"image","priority":40,"defects":[],"bbox":{"x":640,"y":354,"w":280,"h":200},"fontSize":16},{"eid":"e_callout","type":"text","priority":60,"defects":[],"bbox":{"x":640,"y":564,"w":600,"h":104},"fontSize":15},{"eid":"e_source","type":"text","priority":60,"defects":[],"bbox":{"x":40,"y":687,"w":583,"h":21},"fontSize":10}],"summary":{"defect_count":1,"total_severity":9728,"warning_count":1,"warning_severity":1776,"conflict_graph":[{"eids":["e_subtitle","e_title"],"edges":[{"owner_eid":"e_subtitle","other_eid":"e_title","overlap_area":4864,"separations":[{"direction":"move_down","target_y":94,"cost_px":4},{"direction":"move_up","target_y":-11,"cost_px":101},{"direction":"move_right","target_x":1256,"cost_px":1216},{"direction":"move_left","target_x":-1176,"cost_px":1216}]}],"envelopes":[{"eid":"e_subtitle","free_top":82,"free_bottom":9,"free_left":32,"free_right":32},{"eid":"e_title","free_top":20,"free_bottom":44,"free_left":32,"free_right":32}]}]},"fingerprint":null,"tabooFingerprints":[]},{"iter":1,"diagJSON":"{\n  \"defects\": [],\n  \"warnings\": [\n    {\n      \"type\": \"occlusion_suspected\",\n      \"owner_eid\": \"e_photo2\",\n      \"other_eid\": \"e_callout\",\n      \"details\": {\n        \"overlap_area_px\": 1776,\n        \"top_eid\": \"e_callout\"\n      }\n    }\n  ],\n  \"summary\": {\n    \"defect_count\": 0,\n    \"total_severity\": 0,\n    \"warning_count\": 1,\n    \"warning_severity\": 1776\n  }\n}","patchJSON":null,"overridesJSON":null,"elements":[{"eid":"e_panel","type":"decoration","priority":10,"defects":[],"bbox":{"x":0,"y":0,"w":1280,"h":720},"fontSize":16},{"eid":"e_accent","type":"decoration","priority":10,"defects":[],"bbox":{"x":0,"y":0,"w":12,"h":720},"fontSize":16},{"eid":"e_title","type":"title","priority":100,"defects":[],"bbox":{"x":40,"y":28,"w":1200,"h":50},"fontSize":42},{"eid":"e_subtitle","type":"text","priority":70,"defects":[],"bbox":{"x":40,"y":94,"w":1200,"h":23},"fontSize":18},{"eid":"e_metrics","type":"bullets","priority":80,"defects":[],"bbox":{"x":40,"y":138,"w":560,"h":416},"fontSize":15},{"eid":"e_photo1","type":"image","priority":40,"defects":[],"bbox":{"x":640,"y":138,"w":280,"h":200},"fontSize":16},{"eid":"e_photo2","type":"image","priority":40,"defects":[],"bbox":{"x":640,"y":354,"w":280,"h":200},"fontSize":16},{"eid":"e_callout","type":"text","priority":60,"defects":[],"bbox":{"x":640,"y":564,"w":600,"h":104},"fontSize":15},{"eid":"e_source","type":"text","priority":60,"defects":[],"bbox":{"x":40,"y":687,"w":583,"h":21},"fontSize":10}],"summary":{"defect_count":0,"total_severity":0,"warning_count":1,"warning_severity":1776},"fingerprint":null,"tabooFingerprints":[]}];
+var currentIter = 0;
+var activePanelTab = 'diag';
+var playing = false;
+var playTimer = null;
+var playSpeed = 1000;
+var animating = false;
+
+// ── Panel sub-tabs ──
+function switchPanelTab(tab) {
+  activePanelTab = tab;
+  document.querySelectorAll('.panel-tab').forEach(function(b) { b.classList.remove('active'); });
+  document.querySelector('.panel-tab[data-ptab="' + tab + '"]').classList.add('active');
+  updatePanelContent();
+}
+
+function updatePanelContent() {
+  var meta = iterDataMeta[currentIter];
+  var content = '';
+  if (activePanelTab === 'diag') {
+    content = meta.diagJSON;
+  } else if (activePanelTab === 'patch') {
+    content = meta.patchJSON || '(initial iteration)';
+  } else if (activePanelTab === 'overrides') {
+    content = meta.overridesJSON || '(none)';
+  }
+  document.getElementById('panel-content').textContent = content;
+}
+
+function switchIter(idx) {
+  currentIter = idx;
+  document.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('active'); });
+  document.querySelectorAll('.tab')[idx].classList.add('active');
+  document.querySelectorAll('.iter-slide').forEach(function(s) {
+    s.style.display = s.dataset.iter == idx ? 'block' : 'none';
+  });
+  // Update timeline markers
+  document.querySelectorAll('.timeline-marker').forEach(function(m) {
+    m.classList.toggle('active', +m.dataset.idx === idx);
+  });
+  // Update progress bar
+  var total = iterDataMeta.length - 1;
+  var pct = total > 0 ? (idx / total * 100) : 0;
+  document.getElementById('timeline-progress').style.width = pct + '%';
+  updatePanelContent();
+}
+
+function invertAll() {
+  var boxes = document.querySelectorAll('#toggles input[data-layer]');
+  boxes.forEach(function(cb) {
+    cb.checked = !cb.checked;
+    toggleLayer(cb.getAttribute('data-layer'), cb.checked);
+  });
+}
+
+function toggleLayer(layer, show) {
+  var slides = document.querySelectorAll('.iter-slide');
+  slides.forEach(function(s) {
+    s.querySelectorAll('[data-layer="' + layer + '"]').forEach(function(el) {
+      el.style.display = show ? '' : 'none';
+    });
+  });
+}
+
+function togglePanel() {
+  var panel = document.getElementById('panel');
+  panel.classList.toggle('collapsed');
+}
+
+// ── Animation layer ──
+var typeColors = { text: '#3b82f6', title: '#3b82f6', bullets: '#3b82f6', image: '#22c55e', decoration: '#6b7280' };
+
+function transitionTo(targetIdx) {
+  if (animating || targetIdx < 0 || targetIdx >= iterDataMeta.length) return;
+  if (targetIdx === currentIter) return;
+  var fromIdx = currentIter;
+  // Non-adjacent: skip animation
+  if (Math.abs(targetIdx - fromIdx) > 1) {
+    switchIter(targetIdx);
+    return;
+  }
+  animating = true;
+  var fromElems = iterDataMeta[fromIdx].elements;
+  var toElems = iterDataMeta[targetIdx].elements;
+  var layer = document.getElementById('anim-layer');
+  layer.innerHTML = '';
+
+  // Build animated rects from source positions
+  var rects = [];
+  for (var i = 0; i < fromElems.length; i++) {
+    var fe = fromElems[i];
+    var te = null;
+    for (var j = 0; j < toElems.length; j++) {
+      if (toElems[j].eid === fe.eid) { te = toElems[j]; break; }
+    }
+    if (!te) continue;
+    var div = document.createElement('div');
+    div.className = 'anim-rect';
+    var c = typeColors[fe.type] || '#6b7280';
+    div.style.cssText = 'position:absolute;border:2px solid ' + c + ';background:' + c + '20;' +
+      'left:' + fe.bbox.x + 'px;top:' + fe.bbox.y + 'px;width:' + fe.bbox.w + 'px;height:' + fe.bbox.h + 'px;' +
+      'transition:all 0.4s ease-in-out;pointer-events:none;border-radius:3px;';
+    var label = document.createElement('span');
+    label.style.cssText = 'position:absolute;top:2px;left:4px;font-size:9px;color:' + c + ';font-family:monospace;opacity:0.8;';
+    label.textContent = fe.eid;
+    div.appendChild(label);
+    layer.appendChild(div);
+    rects.push({ div: div, target: te.bbox });
+  }
+
+  layer.style.display = 'block';
+  // Force reflow
+  void layer.offsetHeight;
+  // Animate to target
+  for (var k = 0; k < rects.length; k++) {
+    var r = rects[k];
+    r.div.style.left = r.target.x + 'px';
+    r.div.style.top = r.target.y + 'px';
+    r.div.style.width = r.target.w + 'px';
+    r.div.style.height = r.target.h + 'px';
+  }
+
+  setTimeout(function() {
+    layer.style.display = 'none';
+    layer.innerHTML = '';
+    switchIter(targetIdx);
+    animating = false;
+  }, 450);
+}
+
+// ── Play/Pause ──
+function togglePlay() {
+  if (playing) {
+    stopPlay();
+  } else {
+    playing = true;
+    document.getElementById('btn-play').textContent = '⏸';
+    advancePlay();
+  }
+}
+
+function advancePlay() {
+  if (!playing) return;
+  var next = currentIter + 1;
+  if (next >= iterDataMeta.length) {
+    stopPlay();
+    return;
+  }
+  transitionTo(next);
+  playTimer = setTimeout(advancePlay, playSpeed + 500);
+}
+
+function stopPlay() {
+  playing = false;
+  if (playTimer) { clearTimeout(playTimer); playTimer = null; }
+  document.getElementById('btn-play').textContent = '▶';
+}
+
+function setSpeed(ms) {
+  playSpeed = ms;
+}
+
+function stepBack() {
+  stopPlay();
+  transitionTo(currentIter - 1);
+}
+
+function stepForward() {
+  stopPlay();
+  transitionTo(currentIter + 1);
+}
+
+function jumpTo(idx) {
+  stopPlay();
+  if (Math.abs(idx - currentIter) <= 1) {
+    transitionTo(idx);
+  } else {
+    switchIter(idx);
+  }
+}
+
+// ── Keyboard shortcuts ──
+document.addEventListener('keydown', function(e) {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') return;
+  switch (e.key) {
+    case 'ArrowLeft': case 'h': e.preventDefault(); stepBack(); break;
+    case 'ArrowRight': case 'l': e.preventDefault(); stepForward(); break;
+    case ' ': e.preventDefault(); togglePlay(); break;
+    default:
+      if (e.key >= '0' && e.key <= '9') {
+        var n = +e.key;
+        if (n < iterDataMeta.length) jumpTo(n);
+      }
+  }
+});
+
+// ── Highlight helpers ──
+function highlightChain(eid) {
+  document.querySelectorAll('.conflict-elem, .conflict-panel-row').forEach(function(g) {
+    if (g.dataset.conflictEid === eid) g.classList.add('active');
+  });
+}
+function clearChain() {
+  document.querySelectorAll('.conflict-elem.active, .conflict-panel-row.active').forEach(function(g) {
+    g.classList.remove('active');
+  });
+}
+function highlightDefect(eid) {
+  document.querySelectorAll('.defect-group').forEach(function(g) {
+    if (g.dataset.defectEid === eid) g.classList.add('active');
+  });
+}
+function clearDefect() {
+  document.querySelectorAll('.defect-group.active').forEach(function(g) {
+    g.classList.remove('active');
+  });
+}
+
+// ── Unified hover handler ──
+var hoverRaf = null;
+document.addEventListener('mouseover', function(e) {
+  if (hoverRaf) cancelAnimationFrame(hoverRaf);
+  hoverRaf = requestAnimationFrame(function() {
+    var target = e.target;
+    clearChain();
+    clearDefect();
+
+    if (target.closest) {
+      var cg = target.closest('.conflict-elem') || target.closest('.conflict-panel-row');
+      if (cg && cg.dataset.conflictEid) highlightChain(cg.dataset.conflictEid);
+      var dg = target.closest('.defect-group');
+      if (dg && dg.dataset.defectEid) highlightDefect(dg.dataset.defectEid);
+    }
+
+    var eidTarget = target;
+    while (eidTarget && eidTarget !== document.body) {
+      if (eidTarget.dataset && eidTarget.dataset.eid) break;
+      eidTarget = eidTarget.parentElement;
+    }
+    if (eidTarget && eidTarget.dataset && eidTarget.dataset.eid) {
+      var eid = eidTarget.dataset.eid;
+      highlightDefect(eid);
+      var meta = iterDataMeta[currentIter];
+      var elem = meta.elements.find(function(el) { return el.eid === eid; });
+      if (elem) {
+        var tip = document.getElementById('tooltip');
+        var lines = ['<b>' + eid + '</b>', 'type: ' + elem.type, 'priority: ' + elem.priority];
+        if (elem.defects.length > 0) {
+          lines.push('<hr>');
+          elem.defects.forEach(function(d) { lines.push('<span class="tip-defect">' + d.type + '</span> sev=' + d.severity); });
+        }
+        tip.innerHTML = lines.join('<br>');
+        tip.style.display = 'block';
+        var rect = eidTarget.getBoundingClientRect();
+        tip.style.left = (rect.right + 8) + 'px';
+        tip.style.top = rect.top + 'px';
+      }
+    } else {
+      document.getElementById('tooltip').style.display = 'none';
+    }
+  });
+});
+
+document.addEventListener('mouseout', function(e) {
+  var related = e.relatedTarget;
+  if (!related || !related.closest) {
+    clearChain(); clearDefect();
+    document.getElementById('tooltip').style.display = 'none';
+    return;
+  }
+  if (!related.closest('.conflict-elem') && !related.closest('.conflict-panel-row')) clearChain();
+  if (!related.closest('.defect-group') && !related.closest('[data-eid]')) clearDefect();
+  var inEid = related;
+  while (inEid && inEid !== document.body) {
+    if (inEid.dataset && inEid.dataset.eid) break;
+    inEid = inEid.parentElement;
+  }
+  if (!inEid || !inEid.dataset || !inEid.dataset.eid) {
+    document.getElementById('tooltip').style.display = 'none';
+  }
+});
+</script>
+</body>
+</html>

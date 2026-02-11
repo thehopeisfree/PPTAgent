@@ -1,0 +1,91 @@
+{
+  "defects": [
+    {
+      "type": "overlap",
+      "owner_eid": "e_subtitle",
+      "other_eid": "e_title",
+      "severity": 9728,
+      "details": {
+        "overlap_area_px": 4864,
+        "severity_note": "×2 (text involved)"
+      },
+      "hint": {
+        "action": "move_down",
+        "validated": true,
+        "target_eid": "e_subtitle",
+        "reason": "clear e_title safeBox edge",
+        "suggested_y": 94
+      }
+    }
+  ],
+  "warnings": [
+    {
+      "type": "occlusion_suspected",
+      "owner_eid": "e_photo2",
+      "other_eid": "e_callout",
+      "details": {
+        "overlap_area_px": 1776,
+        "top_eid": "e_callout"
+      }
+    }
+  ],
+  "summary": {
+    "defect_count": 1,
+    "total_severity": 9728,
+    "warning_count": 1,
+    "warning_severity": 1776,
+    "conflict_graph": [
+      {
+        "eids": [
+          "e_subtitle",
+          "e_title"
+        ],
+        "edges": [
+          {
+            "owner_eid": "e_subtitle",
+            "other_eid": "e_title",
+            "overlap_area": 4864,
+            "separations": [
+              {
+                "direction": "move_down",
+                "target_y": 94,
+                "cost_px": 4
+              },
+              {
+                "direction": "move_up",
+                "target_y": -11,
+                "cost_px": 101
+              },
+              {
+                "direction": "move_right",
+                "target_x": 1256,
+                "cost_px": 1216
+              },
+              {
+                "direction": "move_left",
+                "target_x": -1176,
+                "cost_px": 1216
+              }
+            ]
+          }
+        ],
+        "envelopes": [
+          {
+            "eid": "e_subtitle",
+            "free_top": 82,
+            "free_bottom": 9,
+            "free_left": 32,
+            "free_right": 32
+          },
+          {
+            "eid": "e_title",
+            "free_top": 20,
+            "free_bottom": 44,
+            "free_left": 32,
+            "free_right": 32
+          }
+        ]
+      }
+    ]
+  }
+}

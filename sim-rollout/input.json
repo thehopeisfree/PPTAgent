@@ -1,0 +1,165 @@
+{
+  "slide": {
+    "w": 1280,
+    "h": 720
+  },
+  "elements": [
+    {
+      "eid": "e_accent",
+      "type": "decoration",
+      "priority": 10,
+      "content": "",
+      "layout": {
+        "x": 0,
+        "y": 0,
+        "w": 12,
+        "h": 720,
+        "zIndex": 0
+      },
+      "style": {
+        "backgroundColor": "#2563eb"
+      }
+    },
+    {
+      "eid": "e_panel",
+      "type": "decoration",
+      "priority": 10,
+      "content": "",
+      "layout": {
+        "x": 0,
+        "y": 0,
+        "w": 1280,
+        "h": 720,
+        "zIndex": 0
+      },
+      "style": {
+        "backgroundColor": "#fafafa"
+      }
+    },
+    {
+      "eid": "e_title",
+      "type": "title",
+      "priority": 100,
+      "content": "Team Performance Q3 2025",
+      "layout": {
+        "x": 40,
+        "y": 28,
+        "w": 800,
+        "h": 72,
+        "zIndex": 10
+      },
+      "style": {
+        "fontSize": 42,
+        "lineHeight": 1.2,
+        "color": "#1e293b",
+        "fontWeight": "bold"
+      }
+    },
+    {
+      "eid": "e_subtitle",
+      "type": "text",
+      "priority": 70,
+      "content": "Engineering & Product Division — Confidential",
+      "layout": {
+        "x": 40,
+        "y": 80,
+        "w": 600,
+        "h": 36,
+        "zIndex": 10
+      },
+      "style": {
+        "fontSize": 18,
+        "lineHeight": 1.3,
+        "color": "#64748b"
+      }
+    },
+    {
+      "eid": "e_metrics",
+      "type": "bullets",
+      "priority": 80,
+      "content": "• Sprint velocity increased 34% (82 → 110 pts/sprint)\n• Deployment frequency: 12/week → 23/week (+92%)\n• Mean time to recovery improved from 4.2h to 1.1h\n• Customer-reported P0 bugs down 67% quarter-over-quarter\n• Code review turnaround reduced from 18h to 6h median\n• Test coverage expanded from 72% to 89% across all repos\n• On-call pages reduced 41% after reliability initiatives\n• 3 major feature launches shipped ahead of schedule",
+      "layout": {
+        "x": 40,
+        "y": 140,
+        "w": 560,
+        "h": 180,
+        "zIndex": 10
+      },
+      "style": {
+        "fontSize": 15,
+        "lineHeight": 1.55,
+        "color": "#334155"
+      }
+    },
+    {
+      "eid": "e_photo1",
+      "type": "image",
+      "priority": 40,
+      "content": "https://via.placeholder.com/280x200/e2e8f0/475569?text=Team+Alpha",
+      "layout": {
+        "x": 660,
+        "y": 160,
+        "w": 280,
+        "h": 200,
+        "zIndex": 10
+      },
+      "style": {
+        "borderRadius": 8
+      }
+    },
+    {
+      "eid": "e_photo2",
+      "type": "image",
+      "priority": 40,
+      "content": "https://via.placeholder.com/280x200/e2e8f0/475569?text=Team+Beta",
+      "layout": {
+        "x": 1020,
+        "y": 160,
+        "w": 280,
+        "h": 200,
+        "zIndex": 10
+      },
+      "style": {
+        "borderRadius": 8
+      }
+    },
+    {
+      "eid": "e_callout",
+      "type": "text",
+      "priority": 60,
+      "content": "Key Insight: Cross-team pairing sessions drove the largest single improvement in review turnaround. Teams that adopted the practice saw 3× faster PR merge times compared to control group.",
+      "layout": {
+        "x": 640,
+        "y": 400,
+        "w": 600,
+        "h": 120,
+        "zIndex": 20
+      },
+      "style": {
+        "fontSize": 15,
+        "lineHeight": 1.5,
+        "backgroundColor": "#eff6ff",
+        "color": "#1e40af",
+        "borderRadius": 8
+      }
+    },
+    {
+      "eid": "e_source",
+      "type": "text",
+      "priority": 60,
+      "content": "Source: Engineering Metrics Dashboard · Internal Use Only · Updated 2025-10-01",
+      "layout": {
+        "x": 40,
+        "y": 680,
+        "w": 700,
+        "h": 28,
+        "zIndex": 10
+      },
+      "style": {
+        "fontSize": 10,
+        "lineHeight": 1.3,
+        "color": "#94a3b8"
+      }
+    }
+  ]
+}

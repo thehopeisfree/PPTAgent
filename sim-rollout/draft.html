@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #fff; }
+    #slide {
+      position: relative;
+      width: 1280px;
+      height: 720px;
+      overflow: hidden;
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+  </style>
+</head>
+<body>
+  <div id="slide">
+    <!-- z-0 decorations: absolute because they're full-bleed -->
+    <div data-eid="e_panel" style="position: absolute; left: 0; top: 0; width: 1280px; height: 720px; z-index: 0; background-color: #fafafa;"></div>
+    <div data-eid="e_accent" style="position: absolute; left: 0; top: 0; width: 12px; height: 720px; z-index: 1; background-color: #2563eb;"></div>
+
+    <!-- content wrapper: flexbox column -->
+    <div style="position: absolute; left: 40px; top: 28px; right: 40px; bottom: 12px; z-index: 10; display: flex; flex-direction: column;">
+
+      <!-- header -->
+      <div data-eid="e_title" style="font-size: 42px; line-height: 1.2; font-weight: bold; color: #1e293b; overflow: visible; margin-bottom: 12px;">
+        Team Performance Q3 2025
+      </div>
+      <div data-eid="e_subtitle" style="font-size: 18px; line-height: 1.3; color: #64748b; overflow: visible; margin-bottom: 24px;">
+        Engineering &amp; Product Division — Confidential
+      </div>
+
+      <!-- two-column body -->
+      <div style="display: flex; flex: 1; gap: 40px;">
+        <!-- left: bullet metrics -->
+        <div data-eid="e_metrics" style="flex: 0 0 560px; font-size: 20px; line-height: 1.55; color: #334155; overflow: visible;">
+          <ul style="margin: 0; padding-left: 1.5em; list-style-type: disc;">
+            <li>Sprint velocity increased 34% (82 → 110 pts/sprint)</li>
+            <li>Deployment frequency: 12/week → 23/week (+92%)</li>
+            <li>Mean time to recovery improved from 4.2h to 1.1h</li>
+            <li>Customer-reported P0 bugs down 67% quarter-over-quarter</li>
+            <li>Code review turnaround reduced from 18h to 6h median</li>
+            <li>Test coverage expanded from 72% to 89% across all repos</li>
+            <li>On-call pages reduced 41% after reliability initiatives</li>
+            <li>3 major feature launches shipped ahead of schedule</li>
+          </ul>
+        </div>
+
+        <!-- right: photos stacked vertically -->
+        <div style="display: flex; flex-direction: column; gap: 16px; flex: 1;">
+          <div data-eid="e_photo1" style="width: 280px; height: 200px; border-radius: 8px; overflow: visible;">
+            <img src="https://via.placeholder.com/280x200/e2e8f0/475569?text=Team+Alpha" style="width: 100%; height: 100%; object-fit: contain;" alt="" />
+          </div>
+          <div data-eid="e_photo2" style="width: 280px; height: 200px; border-radius: 8px; overflow: visible;">
+            <img src="https://via.placeholder.com/280x200/e2e8f0/475569?text=Team+Beta" style="width: 100%; height: 100%; object-fit: contain;" alt="" />
+          </div>
+        </div>
+      </div>
+
+      <!-- spacer to push source to bottom -->
+      <div style="flex: 1;"></div>
+    </div>
+
+    <!-- callout: positioned at bottom-right -->
+    <div data-eid="e_callout" style="position: absolute; left: 640px; bottom: 52px; width: 600px; z-index: 20; padding: 16px; font-size: 16px; line-height: 1.5; background-color: #eff6ff; color: #1e40af; border-radius: 8px; overflow: visible;">
+      Key Insight: Cross-team pairing sessions drove the largest single improvement in review turnaround. Teams that adopted the practice saw 3× faster PR merge times compared to control group.
+    </div>
+
+    <!-- source: pinned to bottom -->
+    <div data-eid="e_source" style="position: absolute; left: 40px; bottom: 12px; font-size: 16px; line-height: 1.3; color: #94a3b8; overflow: visible;">
+      Source: Engineering Metrics Dashboard · Internal Use Only · Updated 2025-10-01
+    </div>
+  </div>
+</body>
+</html>
