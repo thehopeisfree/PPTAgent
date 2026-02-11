@@ -3,11 +3,11 @@ import type { IRElement } from "../../schema/ir.js";
 import type { Defect, OverlapDetails, Warning, Hint } from "../../schema/diag.js";
 import {
   MIN_OVERLAP_AREA_PX,
-  SAFE_PADDING,
   TEXT_OVERLAP_SEVERITY_MULT,
   TEXT_TYPES,
 } from "../../constants.js";
 import { intersectionArea } from "../../utils/geometry.js";
+import { computeSeparationOptions } from "../hints/separation-calculator.js";
 
 interface ElementPair {
   domA: DOMElement;
@@ -52,6 +52,9 @@ export function detectOverlaps(
 
       // Skip if either is decoration
       if (irA.type === "decoration" || irB.type === "decoration") continue;
+
+      // Skip if both belong to the same group (e.g. text on shape)
+      if (irA.group && irA.group === irB.group) continue;
 
       const area = intersectionArea(domA.safeBox, domB.safeBox);
       if (area < MIN_OVERLAP_AREA_PX) continue;
@@ -117,62 +120,11 @@ export function detectOverlaps(
 
 /**
  * Compute a move hint to resolve overlap.
- * Finds the smallest move direction for the owner element.
+ * Delegates to computeSeparationOptions and picks the cheapest direction.
  */
 function computeMoveHint(owner: DOMElement, other: DOMElement): Hint {
-  // Calculate distances needed in each direction to clear the overlap
-  const clearLeft = other.safeBox.x - (owner.safeBox.x + owner.safeBox.w);
-  const clearRight =
-    other.safeBox.x + other.safeBox.w - owner.safeBox.x;
-  const clearUp = other.safeBox.y - (owner.safeBox.y + owner.safeBox.h);
-  const clearDown =
-    other.safeBox.y + other.safeBox.h - owner.safeBox.y;
-
-  // Move down: owner.bbox.y needs to be at other.safeBox.y + other.safeBox.h - SAFE_PADDING
-  // (because owner.safeBox.y = owner.bbox.y - SAFE_PADDING)
-  const moveDownTarget = other.safeBox.y + other.safeBox.h - SAFE_PADDING;
-  const moveUpTarget =
-    other.safeBox.y - owner.safeBox.h + SAFE_PADDING - SAFE_PADDING;
-  const moveRightTarget = other.safeBox.x + other.safeBox.w - SAFE_PADDING;
-  const moveLeftTarget =
-    other.safeBox.x - owner.safeBox.w + SAFE_PADDING - SAFE_PADDING;
-
-  // Choose the direction with the smallest absolute move
-  const moves: Array<{
-    direction: string;
-    dist: number;
-    target: number;
-    prop: "suggested_y" | "suggested_x";
-  }> = [
-    {
-      direction: "move_down",
-      dist: Math.abs(moveDownTarget - owner.bbox.y),
-      target: moveDownTarget,
-      prop: "suggested_y",
-    },
-    {
-      direction: "move_up",
-      dist: Math.abs(owner.bbox.y - (other.bbox.y - owner.bbox.h - SAFE_PADDING * 2)),
-      target: other.bbox.y - owner.bbox.h - SAFE_PADDING * 2,
-      prop: "suggested_y",
-    },
-    {
-      direction: "move_right",
-      dist: Math.abs(moveRightTarget - owner.bbox.x),
-      target: moveRightTarget,
-      prop: "suggested_x",
-    },
-    {
-      direction: "move_left",
-      dist: Math.abs(owner.bbox.x - (other.bbox.x - owner.bbox.w - SAFE_PADDING * 2)),
-      target: other.bbox.x - owner.bbox.w - SAFE_PADDING * 2,
-      prop: "suggested_x",
-    },
-  ];
-
-  // Sort by distance, pick smallest
-  moves.sort((a, b) => a.dist - b.dist);
-  const best = moves[0]!;
+  const options = computeSeparationOptions(owner, other);
+  const best = options[0]!;
 
   const hint: Hint = {
     action: best.direction,
@@ -180,7 +132,8 @@ function computeMoveHint(owner: DOMElement, other: DOMElement): Hint {
     target_eid: owner.eid,
     reason: `clear ${other.eid} safeBox edge`,
   };
-  hint[best.prop] = Math.round(best.target);
+  if (best.target_y != null) hint.suggested_y = best.target_y;
+  if (best.target_x != null) hint.suggested_x = best.target_x;
 
   return hint;
 }

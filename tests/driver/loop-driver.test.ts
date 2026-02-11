@@ -7,6 +7,8 @@ import {
   createSession,
   initRollout,
   stepRollout,
+  computeFingerprint,
+  checkPatch,
 } from "../../src/driver/loop-driver.js";
 import { parseIR } from "../../src/schema/ir.js";
 import { parsePatch } from "../../src/schema/patch.js";
@@ -160,5 +162,282 @@ describe("Loop Driver (integration)", () => {
     const lastEntry = JSON.parse(lines[lines.length - 1]!);
     expect(lastEntry.overrides).toBeDefined();
     expect(lastEntry.overrides.length).toBeGreaterThan(0);
+  });
+
+  it("initializes tabooFingerprints as empty Set", () => {
+    const session = createSession(page, "/tmp/test");
+    expect(session.tabooFingerprints).toBeInstanceOf(Set);
+    expect(session.tabooFingerprints.size).toBe(0);
+  });
+
+  it("initializes _busy as false", () => {
+    const session = createSession(page, "/tmp/test");
+    expect(session._busy).toBe(false);
+  });
+
+  it("sets _busy during initRollout and resets after", async () => {
+    const cleanIR = parseIR({
+      slide: { w: 1280, h: 720 },
+      elements: [
+        {
+          eid: "e1",
+          type: "title",
+          priority: 100,
+          content: "Test",
+          layout: { x: 100, y: 100, w: 400, h: 80, zIndex: 10 },
+          style: { fontSize: 44, lineHeight: 1.2 },
+        },
+      ],
+    });
+
+    const rolloutDir = path.join(tmpDir, "rollout_busy_init");
+    const session = createSession(page, rolloutDir);
+
+    await initRollout(session, cleanIR);
+    expect(session._busy).toBe(false);
+  });
+
+  it("throws when concurrent stepRollout is attempted", async () => {
+    const cleanIR = parseIR({
+      slide: { w: 1280, h: 720 },
+      elements: [
+        {
+          eid: "e1",
+          type: "title",
+          priority: 100,
+          content: "Test",
+          layout: { x: 100, y: 100, w: 400, h: 80, zIndex: 10 },
+          style: { fontSize: 44, lineHeight: 1.2 },
+        },
+        {
+          eid: "e2",
+          type: "text",
+          priority: 50,
+          content: "Overlapping text",
+          layout: { x: 100, y: 100, w: 400, h: 80, zIndex: 10 },
+          style: { fontSize: 18, lineHeight: 1.5 },
+        },
+      ],
+    });
+
+    const rolloutDir = path.join(tmpDir, "rollout_busy_concurrent");
+    const session = createSession(page, rolloutDir);
+    await initRollout(session, cleanIR);
+
+    const patch = parsePatch({
+      edits: [{ eid: "e2", layout: { y: 250 } }],
+    });
+
+    // Simulate busy state
+    session._busy = true;
+    await expect(stepRollout(session, patch)).rejects.toThrow(
+      "Session is busy"
+    );
+    session._busy = false;
+  });
+
+  it("releases _busy even if initRollout throws", async () => {
+    // Provide a page-like object that will cause extractDOM to fail
+    const badPage = { goto: () => { throw new Error("fake"); } } as unknown as Page;
+    const session = createSession(badPage, path.join(tmpDir, "rollout_busy_error"));
+
+    const cleanIR = parseIR({
+      slide: { w: 1280, h: 720 },
+      elements: [
+        {
+          eid: "e1",
+          type: "title",
+          priority: 100,
+          content: "Test",
+          layout: { x: 100, y: 100, w: 400, h: 80, zIndex: 10 },
+          style: { fontSize: 44, lineHeight: 1.2 },
+        },
+      ],
+    });
+
+    try {
+      await initRollout(session, cleanIR);
+    } catch {
+      // Expected to fail
+    }
+    expect(session._busy).toBe(false);
+  });
+});
+
+describe("computeFingerprint", () => {
+  // computeFingerprint is a pure function — no Playwright page needed
+  const fakePage = null as unknown as Page;
+
+  const baseIR = parseIR({
+    slide: { w: 1280, h: 720 },
+    elements: [
+      {
+        eid: "e1",
+        type: "title",
+        priority: 100,
+        content: "Title",
+        layout: { x: 48, y: 32, w: 400, h: 80, zIndex: 10 },
+        style: { fontSize: 44, lineHeight: 1.2 },
+      },
+      {
+        eid: "e2",
+        type: "bullets",
+        priority: 80,
+        content: "• A",
+        layout: { x: 48, y: 200, w: 400, h: 300, zIndex: 10 },
+        style: { fontSize: 22, lineHeight: 1.5 },
+      },
+    ],
+  });
+
+  it("produces deterministic fingerprints", () => {
+    const patch = parsePatch({
+      edits: [{ eid: "e1", layout: { y: 50 } }],
+    });
+    const fp1 = computeFingerprint(baseIR, patch);
+    const fp2 = computeFingerprint(baseIR, patch);
+    expect(fp1).toBe(fp2);
+    expect(fp1).not.toBe("");
+  });
+
+  it("detects move directions correctly", () => {
+    const patchDown = parsePatch({
+      edits: [{ eid: "e1", layout: { y: 100 } }],
+    });
+    expect(computeFingerprint(baseIR, patchDown)).toContain("e1:move:down");
+
+    const patchUp = parsePatch({
+      edits: [{ eid: "e1", layout: { y: 10 } }],
+    });
+    expect(computeFingerprint(baseIR, patchUp)).toContain("e1:move:up");
+
+    const patchRight = parsePatch({
+      edits: [{ eid: "e1", layout: { x: 100 } }],
+    });
+    expect(computeFingerprint(baseIR, patchRight)).toContain("e1:move:right");
+
+    const patchLeft = parsePatch({
+      edits: [{ eid: "e1", layout: { x: 10 } }],
+    });
+    expect(computeFingerprint(baseIR, patchLeft)).toContain("e1:move:left");
+  });
+
+  it("detects resize directions", () => {
+    const patchGrow = parsePatch({
+      edits: [{ eid: "e1", layout: { w: 500, h: 100 } }],
+    });
+    const fp = computeFingerprint(baseIR, patchGrow);
+    expect(fp).toContain("e1:resize_w:grow");
+    expect(fp).toContain("e1:resize_h:grow");
+
+    const patchShrink = parsePatch({
+      edits: [{ eid: "e1", layout: { w: 300, h: 60 } }],
+    });
+    const fp2 = computeFingerprint(baseIR, patchShrink);
+    expect(fp2).toContain("e1:resize_w:shrink");
+    expect(fp2).toContain("e1:resize_h:shrink");
+  });
+
+  it("detects font size changes", () => {
+    const patchIncrease = parsePatch({
+      edits: [{ eid: "e1", style: { fontSize: 50 } }],
+    });
+    expect(computeFingerprint(baseIR, patchIncrease)).toContain("e1:font:increase");
+
+    const patchDecrease = parsePatch({
+      edits: [{ eid: "e1", style: { fontSize: 38 } }],
+    });
+    expect(computeFingerprint(baseIR, patchDecrease)).toContain("e1:font:decrease");
+  });
+
+  it("returns empty string for no-op patch", () => {
+    // Patch that doesn't change anything
+    const patch = parsePatch({
+      edits: [{ eid: "e1", layout: { y: 32 } }], // same as current
+    });
+    expect(computeFingerprint(baseIR, patch)).toBe("");
+  });
+
+  it("returns empty string for unknown eid", () => {
+    const patch = parsePatch({
+      edits: [{ eid: "unknown", layout: { y: 100 } }],
+    });
+    expect(computeFingerprint(baseIR, patch)).toBe("");
+  });
+});
+
+describe("checkPatch", () => {
+  // checkPatch is a pure function — no Playwright page needed
+  const fakePage = null as unknown as Page;
+
+  const baseIR = parseIR({
+    slide: { w: 1280, h: 720 },
+    elements: [
+      {
+        eid: "e1",
+        type: "title",
+        priority: 100,
+        content: "Title",
+        layout: { x: 48, y: 32, w: 400, h: 80, zIndex: 10 },
+        style: { fontSize: 44, lineHeight: 1.2 },
+      },
+    ],
+  });
+
+  it("allows patch when taboo list is empty", () => {
+    const session = createSession(fakePage, "/tmp/test");
+    // Simulate having a history entry
+    session.history.push({
+      iter: 0,
+      ir: baseIR,
+      diag: { defects: [], warnings: [], summary: { defect_count: 0, total_severity: 0, warning_count: 0 } },
+      defectCount: 0,
+      totalSeverity: 0,
+      warningCount: 0,
+    });
+
+    const patch = parsePatch({
+      edits: [{ eid: "e1", layout: { y: 100 } }],
+    });
+
+    const result = checkPatch(session, patch);
+    expect(result.allowed).toBe(true);
+    expect(result.fingerprint).not.toBe("");
+  });
+
+  it("rejects patch matching taboo fingerprint", () => {
+    const session = createSession(fakePage, "/tmp/test");
+    session.history.push({
+      iter: 0,
+      ir: baseIR,
+      diag: { defects: [], warnings: [], summary: { defect_count: 0, total_severity: 0, warning_count: 0 } },
+      defectCount: 0,
+      totalSeverity: 0,
+      warningCount: 0,
+    });
+
+    const patch = parsePatch({
+      edits: [{ eid: "e1", layout: { y: 100 } }],
+    });
+
+    // Add the fingerprint to taboo
+    const fp = computeFingerprint(baseIR, patch);
+    session.tabooFingerprints.add(fp);
+
+    const result = checkPatch(session, patch);
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toBeDefined();
+    expect(result.fingerprint).toBe(fp);
+  });
+
+  it("allows patch when no history exists", () => {
+    const session = createSession(fakePage, "/tmp/test");
+    const patch = parsePatch({
+      edits: [{ eid: "e1", layout: { y: 100 } }],
+    });
+
+    const result = checkPatch(session, patch);
+    expect(result.allowed).toBe(true);
+    expect(result.fingerprint).toBe("");
   });
 });

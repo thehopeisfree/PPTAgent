@@ -186,4 +186,53 @@ describe("overlap detector", () => {
     expect(defects[0]!.hint).toBeDefined();
     expect(defects[0]!.hint!.validated).toBe(true);
   });
+
+  it("exempts same-group elements from overlap and occlusion checks", () => {
+    const domEls: DOMElement[] = [
+      makeDOMEl({
+        eid: "card_bg",
+        bbox: { x: 100, y: 100, w: 300, h: 200 },
+        safeBox: { x: 92, y: 92, w: 316, h: 216 },
+        zIndex: 10,
+      }),
+      makeDOMEl({
+        eid: "card_text",
+        bbox: { x: 120, y: 120, w: 260, h: 160 },
+        safeBox: { x: 112, y: 112, w: 276, h: 176 },
+        zIndex: 10,
+      }),
+    ];
+    const irEls: IRElement[] = [
+      makeIREl({ eid: "card_bg", priority: 40, group: "card1" }),
+      makeIREl({ eid: "card_text", priority: 60, group: "card1" }),
+    ];
+
+    const { defects, warnings } = detectOverlaps(domEls, irEls);
+    expect(defects).toHaveLength(0);
+    expect(warnings).toHaveLength(0);
+  });
+
+  it("still detects overlap between elements in different groups", () => {
+    const domEls: DOMElement[] = [
+      makeDOMEl({
+        eid: "card1_bg",
+        bbox: { x: 100, y: 100, w: 300, h: 200 },
+        safeBox: { x: 92, y: 92, w: 316, h: 216 },
+        zIndex: 10,
+      }),
+      makeDOMEl({
+        eid: "card2_bg",
+        bbox: { x: 200, y: 150, w: 300, h: 200 },
+        safeBox: { x: 192, y: 142, w: 316, h: 216 },
+        zIndex: 10,
+      }),
+    ];
+    const irEls: IRElement[] = [
+      makeIREl({ eid: "card1_bg", priority: 40, group: "card1" }),
+      makeIREl({ eid: "card2_bg", priority: 40, group: "card2" }),
+    ];
+
+    const { defects } = detectOverlaps(domEls, irEls);
+    expect(defects).toHaveLength(1);
+  });
 });

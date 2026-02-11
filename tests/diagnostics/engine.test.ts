@@ -148,7 +148,112 @@ describe("Diagnostics Engine", () => {
     expect(overlapDefects).toHaveLength(0);
   });
 
-  it("builds conflict chains for overlapping elements", () => {
+  it("detects layout_topology when title is below body", () => {
+    const ir: IRDocument = {
+      slide: { w: 1280, h: 720 },
+      elements: [
+        {
+          eid: "e_title",
+          type: "title",
+          priority: 100,
+          content: "Title",
+          layout: { x: 48, y: 400, w: 400, h: 80, zIndex: 10 },
+          style: { fontSize: 44, lineHeight: 1.2 },
+        },
+        {
+          eid: "e_bullets",
+          type: "bullets",
+          priority: 80,
+          content: "• A\n• B",
+          layout: { x: 48, y: 100, w: 400, h: 200, zIndex: 10 },
+          style: { fontSize: 22, lineHeight: 1.5 },
+        },
+      ],
+    };
+    const dom: DOMDocument = {
+      slide: { w: 1280, h: 720 },
+      safe_padding: 8,
+      elements: [
+        {
+          eid: "e_title",
+          bbox: { x: 48, y: 400, w: 400, h: 80 },
+          safeBox: { x: 40, y: 392, w: 416, h: 96 },
+          contentBox: { x: 48, y: 402, w: 300, h: 50 },
+          zIndex: 10,
+          computed: { fontSize: 44, lineHeight: 1.2 },
+        },
+        {
+          eid: "e_bullets",
+          bbox: { x: 48, y: 100, w: 400, h: 200 },
+          safeBox: { x: 40, y: 92, w: 416, h: 216 },
+          contentBox: { x: 48, y: 102, w: 350, h: 180 },
+          zIndex: 10,
+          computed: { fontSize: 22, lineHeight: 1.5 },
+        },
+      ],
+    };
+
+    const diag = diagnose(dom, ir);
+    const topoDefects = diag.defects.filter((d) => d.type === "layout_topology");
+    expect(topoDefects).toHaveLength(1);
+    expect(topoDefects[0]!.severity).toBe(5000);
+  });
+
+  it("places layout_topology defects before font_too_small in defect order", () => {
+    const ir: IRDocument = {
+      slide: { w: 1280, h: 720 },
+      elements: [
+        {
+          eid: "e_title",
+          type: "title",
+          priority: 100,
+          content: "Title",
+          layout: { x: 48, y: 500, w: 400, h: 80, zIndex: 10 },
+          style: { fontSize: 44, lineHeight: 1.2 },
+        },
+        {
+          eid: "e_text",
+          type: "text",
+          priority: 60,
+          content: "Body",
+          layout: { x: 48, y: 100, w: 400, h: 200, zIndex: 10 },
+          style: { fontSize: 14, lineHeight: 1.5 },
+        },
+      ],
+    };
+    const dom: DOMDocument = {
+      slide: { w: 1280, h: 720 },
+      safe_padding: 8,
+      elements: [
+        {
+          eid: "e_title",
+          bbox: { x: 48, y: 500, w: 400, h: 80 },
+          safeBox: { x: 40, y: 492, w: 416, h: 96 },
+          contentBox: { x: 48, y: 502, w: 300, h: 50 },
+          zIndex: 10,
+          computed: { fontSize: 44, lineHeight: 1.2 },
+        },
+        {
+          eid: "e_text",
+          bbox: { x: 48, y: 100, w: 400, h: 200 },
+          safeBox: { x: 40, y: 92, w: 416, h: 216 },
+          contentBox: { x: 48, y: 102, w: 350, h: 60 },
+          zIndex: 10,
+          computed: { fontSize: 14, lineHeight: 1.5 },
+        },
+      ],
+    };
+
+    const diag = diagnose(dom, ir);
+    const types = diag.defects.map((d) => d.type);
+    const topoIdx = types.indexOf("layout_topology");
+    const fontIdx = types.indexOf("font_too_small");
+    expect(topoIdx).toBeGreaterThanOrEqual(0);
+    expect(fontIdx).toBeGreaterThanOrEqual(0);
+    expect(topoIdx).toBeLessThan(fontIdx);
+  });
+
+  it("builds conflict graph for overlapping elements", () => {
     const ir: IRDocument = {
       slide: { w: 1280, h: 720 },
       elements: [
@@ -194,8 +299,12 @@ describe("Diagnostics Engine", () => {
     };
 
     const diag = diagnose(dom, ir);
-    expect(diag.summary.conflict_chain).toBeDefined();
-    expect(diag.summary.conflict_chain!.length).toBeGreaterThanOrEqual(2);
-    expect(diag.summary.chain_hints).toBeDefined();
+    expect(diag.summary.conflict_graph).toBeDefined();
+    expect(diag.summary.conflict_graph!.length).toBeGreaterThanOrEqual(1);
+    const comp = diag.summary.conflict_graph![0]!;
+    expect(comp.eids).toHaveLength(2);
+    expect(comp.edges).toHaveLength(1);
+    expect(comp.edges[0]!.separations).toHaveLength(4);
+    expect(comp.envelopes).toHaveLength(2);
   });
 });

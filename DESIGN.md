@@ -40,6 +40,7 @@ LLM ──JSON Patch──→ IR ──HTML──→ Playwright Render
 | `HIGH_PRIO_MOVE_PX`  | 48      | Max single-patch absolute move for position properties (x, y) on priority ≥ 80 |
 | `ALLOW_HIDE`          | false   | Whether Hard Fallback may set `display: none` on elements |
 | `TEXT_OVERLAP_SEVERITY_MULT` | 2 | Severity multiplier when overlap involves text elements  |
+| `TOPOLOGY_SEVERITY`  | 5000    | Fixed severity for layout topology violations (structural) |
 
 ### Coordinate System
 
@@ -291,6 +292,7 @@ The diagnostics engine detects defects and generates **math hints** so the LLM d
 
 | Type               | Trigger                                                                    | Details                          | Hint                                       |
 |--------------------|----------------------------------------------------------------------------|----------------------------------|--------------------------------------------|
+| `layout_topology`  | Title element center-y > body (bullets/text) element center-y              | `rule`, `title_eid`, `body_eid`, `title_cy`, `body_cy` | `move_to_top` with `suggested_y`  |
 | `content_overflow` | `contentBox.h > bbox.h` OR `contentBox.w > bbox.w`                         | `overflow_x_px`, `overflow_y_px` | `suggested_h` / `suggested_w` (+ buffer)   |
 | `out_of_bounds`    | bbox exceeds slide bounds beyond `OOB_EPS_PX`                             | `edge`, `by_px`                  | `suggested_x/y` and/or `suggested_w/h`     |
 | `overlap`          | safeBox intersection area ≥ `MIN_OVERLAP_AREA_PX`, same zIndex, neither is `decoration` | `other_eid`, `overlap_area_px`   | `suggested_move` (direction + target value) |
@@ -368,12 +370,13 @@ Example (infeasible chain — not enough vertical space):
 
 When multiple defect types coexist, resolve in this order:
 
-1. **`font_too_small`** — restore minimum readability first.
-2. **`content_overflow`** — fix via increase_h / reduce fontSize (within budget) / line-clamp.
-3. **`out_of_bounds`** — fix via move_in / shrink, clamp to safe zone.
-4. **`overlap`** — fix via move `owner_eid` / resize / shrink font on lower-priority.
+1. **`layout_topology`** — restore structural reading order first (e.g., title above body).
+2. **`font_too_small`** — restore minimum readability.
+3. **`content_overflow`** — fix via increase_h / reduce fontSize (within budget) / line-clamp.
+4. **`out_of_bounds`** — fix via move_in / shrink, clamp to safe zone.
+5. **`overlap`** — fix via move `owner_eid` / resize / shrink font on lower-priority.
 
-Rationale: Font and overflow fixes change element sizes, which can resolve or shift overlaps. Fixing overlap first risks wasted work.
+Rationale: Topology fixes restore semantic structure; font and overflow fixes change element sizes, which can resolve or shift overlaps. Fixing overlap first risks wasted work.
 
 ### 5.8 Total Severity
 
@@ -390,7 +393,25 @@ Each defect contributes a raw severity value to `total_severity`:
 
 `total_severity = sum of all defect severities`. Reported in every `diag_k.json` summary and every trace line.
 
-### 5.9 Example `diag_k.json`
+### 5.9 Layout Topology Detection
+
+The `layout_topology` defect detects violations of semantic reading order: a title element's center-y must not be below any body element's (bullets/text) center-y. This uses pure relative-position comparison with no magic pixel thresholds.
+
+- **Severity:** Fixed at `TOPOLOGY_SEVERITY` (5000) — structural issues are far more severe than pixel-level defects.
+- **Body types:** Only `bullets` and `text` count as body. `image` and `decoration` are excluded.
+- **Strict comparison:** `title_cy > body_cy` (equal center-y is not a violation).
+- **Hint:** `move_to_top` with `suggested_y` placing the title above the body element.
+
+### 5.10 Anti-Repeat Memory (Patch Fingerprinting)
+
+To prevent the LLM from repeating failed strategies after rollback, the driver maintains a **taboo list** of patch fingerprints:
+
+- **Fingerprint computation:** Each patch edit generates direction signatures (e.g., `eid:move:down`, `eid:resize_w:shrink`, `eid:font:decrease`). Signatures are sorted, deduplicated, and joined with `|`.
+- **Recording:** When `stepRollout` detects a non-improving iteration (both defect_count and total_severity did not improve), the patch fingerprint is added to the session's taboo set.
+- **Checking:** Callers invoke `checkPatch(session, patch)` before `stepRollout`. If the fingerprint matches a taboo entry, `{ allowed: false, reason, fingerprint }` is returned.
+- **Scope:** Taboo fingerprints are per-session (per-rollout). They are included in `RolloutMetrics.taboo_fingerprints` for tracing.
+
+### 5.11 Example `diag_k.json`
 
 ```json
 {

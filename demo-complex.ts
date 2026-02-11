@@ -18,6 +18,7 @@ import { applyPatch } from "./src/patch/apply-patch.js";
 import { generateDebugHTML } from "./src/debug/visual-debug.js";
 import type { DebugSnapshot } from "./src/debug/visual-debug.js";
 import { injectDebugOverlay } from "./src/debug/overlay.js";
+import { computeFingerprint } from "./src/driver/loop-driver.js";
 
 // ── Slide: "Team Overview" with 8 elements and cascading layout problems ──
 //
@@ -192,12 +193,17 @@ function printDiag(label: string, diag: ReturnType<typeof diagnose>) {
     }
   }
 
-  if (diag.summary.conflict_chain && diag.summary.conflict_chain.length > 0) {
-    console.log(`\n  CONFLICT CHAIN: ${diag.summary.conflict_chain.join(" → ")}  (feasible: ${diag.summary.chain_feasible})`);
-    for (const h of diag.summary.chain_hints ?? []) {
-      const { eid, action, ...rest } = h;
-      const extra = Object.keys(rest).length > 0 ? " " + JSON.stringify(rest) : "";
-      console.log(`    ${eid}: ${action}${extra}`);
+  if (diag.summary.conflict_graph && diag.summary.conflict_graph.length > 0) {
+    console.log(`\n  CONFLICT GRAPH (${diag.summary.conflict_graph.length} components):`);
+    for (const comp of diag.summary.conflict_graph) {
+      console.log(`    Component: ${comp.eids.join(", ")}`);
+      for (const edge of comp.edges) {
+        const best = edge.separations[0];
+        const alts = edge.separations.slice(1).map((s) => `${s.direction.replace("move_", "")} ${s.cost_px}px`).join(", ");
+        console.log(`      ${edge.owner_eid} \u2192 ${edge.other_eid}: ${best ? best.direction.replace("move_", "") + " " + best.cost_px + "px" : "?"}${alts ? " (or: " + alts + ")" : ""}`);
+      }
+      const envStr = comp.envelopes.map((e) => `${e.eid} \u2191${e.free_top} \u2193${e.free_bottom} \u2190${e.free_left} \u2192${e.free_right}`).join(" | ");
+      console.log(`      Space: ${envStr}`);
     }
   }
 }
@@ -287,9 +293,10 @@ async function main() {
   await browser.close();
 
   // ── Generate debug HTML ──
+  const fp = computeFingerprint(slide, fixPatch);
   const snapshots: DebugSnapshot[] = [
-    { iter: 0, ir: slide, dom: dom0, diag: diag0 },
-    { iter: 1, ir: patchedIR, dom: dom1, diag: diag1, overrides },
+    { iter: 0, ir: slide, dom: dom0, diag: diag0, tabooFingerprints: [] },
+    { iter: 1, ir: patchedIR, dom: dom1, diag: diag1, overrides, patch: fixPatch, fingerprint: fp, tabooFingerprints: [] },
   ];
   const debugHTML = generateDebugHTML(snapshots);
   await fs.writeFile(path.join(outDir, "debug.html"), debugHTML);

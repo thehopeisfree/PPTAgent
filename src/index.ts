@@ -14,7 +14,9 @@ export {
   TEXT_OVERLAP_SEVERITY_MULT,
   MIN_FONT_BY_PRIORITY,
   TEXT_TYPES,
+  IMAGE_ASPECT_RATIO_EPS,
   DEFAULT_Z_INDEX,
+  TOPOLOGY_SEVERITY,
 } from "./constants.js";
 
 // Schema types
@@ -35,13 +37,17 @@ export type {
   DefectType,
   Warning,
   WarningType,
-  ChainHint,
+  SeparationOption,
+  ConflictEdge,
+  SpaceEnvelope,
+  ConflictComponent,
   DiagSummary,
   DiagDocument,
   ContentOverflowDetails,
   OutOfBoundsDetails,
   OverlapDetails,
   FontTooSmallDetails,
+  LayoutTopologyDetails,
 } from "./schema/diag.js";
 
 export type { PatchEdit, PatchDocument } from "./schema/patch.js";
@@ -63,21 +69,25 @@ export { applyPatch } from "./patch/apply-patch.js";
 export type { ApplyPatchResult } from "./patch/apply-patch.js";
 
 // Diagnostics internals (for advanced usage)
+export { detectLayoutTopology } from "./diagnostics/detectors/layout-topology.js";
 export { detectContentOverflow } from "./diagnostics/detectors/content-overflow.js";
 export { detectOutOfBounds } from "./diagnostics/detectors/out-of-bounds.js";
 export { detectOverlaps } from "./diagnostics/detectors/overlap.js";
 export { detectFontTooSmall } from "./diagnostics/detectors/font-too-small.js";
 export { totalSeverity } from "./diagnostics/severity.js";
 export { validateHint } from "./diagnostics/hints/hint-calculator.js";
-export { solveChains } from "./diagnostics/hints/chain-solver.js";
+export { analyzeConflicts } from "./diagnostics/hints/conflict-solver.js";
+export { computeSeparationOptions } from "./diagnostics/hints/separation-calculator.js";
 
 // Driver
 export {
   createSession,
   initRollout,
   stepRollout,
+  computeFingerprint,
+  checkPatch,
 } from "./driver/loop-driver.js";
-export type { RolloutSession, StepResult } from "./driver/loop-driver.js";
+export type { RolloutSession, StepResult, CheckPatchResult } from "./driver/loop-driver.js";
 
 // Geometry utilities
 export {

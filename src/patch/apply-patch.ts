@@ -7,6 +7,7 @@ import {
   SLIDE_W,
   SLIDE_H,
   MIN_FONT_BY_PRIORITY,
+  IMAGE_ASPECT_RATIO_EPS,
 } from "../constants.js";
 
 /** Size properties subject to ratio-based budget */
@@ -131,6 +132,33 @@ export function applyPatch(
             : val;
         }
       }
+      // Enforce image aspect ratio
+      if (el.type === "image") {
+        const origEl = currentIR.elements[idx]!;
+        const origW = origEl.layout.w;
+        const origH = origEl.layout.h;
+        const origRatio = origW / origH;
+        const patchedW = edit.layout.w != null;
+        const patchedH = edit.layout.h != null;
+
+        if (patchedW && !patchedH) {
+          const newH = Math.round(el.layout.w / origRatio);
+          overrides.push({ eid: el.eid, field: "layout.h", requested: el.layout.h, clamped_to: newH, reason: "aspect ratio preserved (w changed)" });
+          el.layout.h = newH;
+        } else if (patchedH && !patchedW) {
+          const newW = Math.round(el.layout.h * origRatio);
+          overrides.push({ eid: el.eid, field: "layout.w", requested: el.layout.w, clamped_to: newW, reason: "aspect ratio preserved (h changed)" });
+          el.layout.w = newW;
+        } else if (patchedW && patchedH) {
+          const newRatio = el.layout.w / el.layout.h;
+          if (Math.abs(newRatio - origRatio) / origRatio > IMAGE_ASPECT_RATIO_EPS) {
+            const newH = Math.round(el.layout.w / origRatio);
+            overrides.push({ eid: el.eid, field: "layout.h", requested: el.layout.h, clamped_to: newH, reason: "aspect ratio preserved (both changed, ratio deviation exceeded)" });
+            el.layout.h = newH;
+          }
+        }
+      }
+
       if (edit.layout.zIndex != null) {
         el.layout.zIndex = edit.layout.zIndex;
       }

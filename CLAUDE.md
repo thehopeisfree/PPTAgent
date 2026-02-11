@@ -20,11 +20,11 @@ LLM ──JSON Patch──→ IR ──HTML──→ Playwright Render
 
 2. **Playwright DOM Extraction** — For each `[data-eid]` element, extracts `bbox`, `safeBox` (bbox inflated by `SAFE_PADDING`), `contentBox` (union of `Range.getClientRects()` — do NOT use `scrollHeight`), `zIndex`, and computed styles. All values must be slide-local (subtract the slide container's viewport offset).
 
-3. **Diagnostics Engine** — Detects four defect types (`content_overflow`, `out_of_bounds`, `overlap`, `font_too_small`) and one warning type (`occlusion_suspected` for cross-zIndex overlaps). Assigns `owner_eid` (lower-priority) vs `other_eid` (higher-priority) for pairwise defects. Builds conflict chains and pre-computes coordinated hints with tail bounds checks. Fix priority order: font → overflow → out_of_bounds → overlap.
+3. **Diagnostics Engine** — Detects five defect types (`layout_topology`, `content_overflow`, `out_of_bounds`, `overlap`, `font_too_small`) and one warning type (`occlusion_suspected` for cross-zIndex overlaps). Assigns `owner_eid` (lower-priority) vs `other_eid` (higher-priority) for pairwise defects. Builds conflict chains and pre-computes coordinated hints with tail bounds checks. Fix priority order: topology → font → overflow → out_of_bounds → overlap.
 
 4. **Patch Apply** — Shallow-merges `layout`/`style` from patch into IR. Enforces dual budget on priority ≥ 80 elements: size properties (w, h, fontSize, lineHeight) capped at 15% change per patch; position properties (x, y) capped at 48px per patch. Logs all clamping to trace `overrides`.
 
-5. **Loop Driver** — Stops on: success (`defect_count == 0`), max iterations (`MAX_ITER=3`), or stall (2 consecutive non-improving iterations on both `defect_count` and `total_severity`). On stall, rolls back to the best prior IR. Hard fallbacks at max iterations: truncate (always), hide lowest-priority element (`ALLOW_HIDE` flag, default false), alert. Final quality is `success_clean`, `success_with_warnings`, or `degraded`.
+5. **Loop Driver** — Stops on: success (`defect_count == 0`), max iterations (`MAX_ITER=3`), or stall (2 consecutive non-improving iterations on both `defect_count` and `total_severity`). On stall, rolls back to the best prior IR. Hard fallbacks at max iterations: truncate (always), hide lowest-priority element (`ALLOW_HIDE` flag, default false), alert. Final quality is `success_clean`, `success_with_warnings`, or `degraded`. Includes **anti-repeat memory**: non-improving patches are fingerprinted and added to a taboo set; callers use `checkPatch()` to reject repeated strategies.
 
 ## Key Constants
 
@@ -38,6 +38,7 @@ LLM ──JSON Patch──→ IR ──HTML──→ Playwright Render
 | `HIGH_PRIO_SIZE_BUDGET` | 0.15 | Max ratio change per patch for size props (priority ≥ 80) |
 | `HIGH_PRIO_MOVE_PX` | 48 | Max absolute move per patch for position props (priority ≥ 80) |
 | `TEXT_OVERLAP_SEVERITY_MULT` | 2 | Severity multiplier when overlap involves text |
+| `TOPOLOGY_SEVERITY` | 5000 | Fixed severity for layout topology violations |
 
 ## File Structure Per Rollout
 

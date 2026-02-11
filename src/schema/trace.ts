@@ -30,6 +30,7 @@ export interface TraceEntry {
   action: string;
   applied_hints?: AppliedHint[];
   overrides?: Override[];
+  rejected_fingerprint?: string;
 }
 
 /** Rollout-level metrics */
@@ -42,4 +43,5 @@ export interface RolloutMetrics {
   final_warning_types: WarningType[];
   quality: QualityLabel;
   budget_overrides: number;
+  taboo_fingerprints?: string[];
 }

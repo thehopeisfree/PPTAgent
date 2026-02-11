@@ -52,6 +52,9 @@ export interface RolloutSession {
   stallCount: number;
   currentIter: number;
   totalOverrides: number;
+  tabooFingerprints: Set<string>;
+  /** @internal Prevents concurrent mutation of session state */
+  _busy: boolean;
 }
 
 /**
@@ -70,7 +73,111 @@ export function createSession(
     stallCount: 0,
     currentIter: 0,
     totalOverrides: 0,
+    tabooFingerprints: new Set<string>(),
+    _busy: false,
   };
+}
+
+/** Result of checking a patch against the taboo list */
+export interface CheckPatchResult {
+  allowed: boolean;
+  reason?: string;
+  fingerprint: string;
+}
+
+/**
+ * Compute a deterministic fingerprint for a patch relative to the current IR.
+ * Each edit produces direction signatures (e.g., "eid:move:down", "eid:resize:shrink").
+ * Signatures are sorted and joined with "|".
+ * Returns empty string if the patch produces no meaningful changes.
+ */
+export function computeFingerprint(
+  currentIR: IRDocument,
+  patch: PatchDocument
+): string {
+  const irMap = new Map<string, (typeof currentIR.elements)[number]>();
+  for (const el of currentIR.elements) {
+    irMap.set(el.eid, el);
+  }
+
+  const signatures: string[] = [];
+
+  for (const edit of patch.edits) {
+    const irEl = irMap.get(edit.eid);
+    if (!irEl) continue;
+
+    // Position changes
+    if (edit.layout) {
+      if (edit.layout.x !== undefined && edit.layout.x !== irEl.layout.x) {
+        const dir = edit.layout.x > irEl.layout.x ? "right" : "left";
+        signatures.push(`${edit.eid}:move:${dir}`);
+      }
+      if (edit.layout.y !== undefined && edit.layout.y !== irEl.layout.y) {
+        const dir = edit.layout.y > irEl.layout.y ? "down" : "up";
+        signatures.push(`${edit.eid}:move:${dir}`);
+      }
+      // Size changes
+      if (edit.layout.w !== undefined && edit.layout.w !== irEl.layout.w) {
+        const dir = edit.layout.w > irEl.layout.w ? "grow" : "shrink";
+        signatures.push(`${edit.eid}:resize_w:${dir}`);
+      }
+      if (edit.layout.h !== undefined && edit.layout.h !== irEl.layout.h) {
+        const dir = edit.layout.h > irEl.layout.h ? "grow" : "shrink";
+        signatures.push(`${edit.eid}:resize_h:${dir}`);
+      }
+    }
+
+    // Font size changes
+    if (edit.style?.fontSize !== undefined && irEl.style.fontSize !== undefined) {
+      if (edit.style.fontSize !== irEl.style.fontSize) {
+        const dir = edit.style.fontSize > irEl.style.fontSize ? "increase" : "decrease";
+        signatures.push(`${edit.eid}:font:${dir}`);
+      }
+    }
+
+    // Line height changes
+    if (edit.style?.lineHeight !== undefined && irEl.style.lineHeight !== undefined) {
+      if (edit.style.lineHeight !== irEl.style.lineHeight) {
+        const dir = edit.style.lineHeight > irEl.style.lineHeight ? "increase" : "decrease";
+        signatures.push(`${edit.eid}:lineHeight:${dir}`);
+      }
+    }
+  }
+
+  if (signatures.length === 0) return "";
+
+  // Sort for determinism, deduplicate, then join
+  const unique = [...new Set(signatures)].sort();
+  return unique.join("|");
+}
+
+/**
+ * Check a patch against the session's taboo list.
+ * Call this before stepRollout to reject previously-failed strategies.
+ */
+export function checkPatch(
+  session: RolloutSession,
+  patch: PatchDocument
+): CheckPatchResult {
+  const prevSnapshot = session.history[session.history.length - 1];
+  if (!prevSnapshot) {
+    return { allowed: true, fingerprint: "" };
+  }
+
+  const fingerprint = computeFingerprint(prevSnapshot.ir, patch);
+  if (fingerprint === "") {
+    return { allowed: true, fingerprint: "" };
+  }
+
+  if (session.tabooFingerprints.has(fingerprint)) {
+    return {
+      allowed: false,
+      reason: `Patch fingerprint matches a previously failed strategy: ${fingerprint}`,
+      fingerprint,
+    };
+  }
+
+  return { allowed: true, fingerprint };
 }
 
 /**
@@ -78,6 +185,21 @@ export function createSession(
  * Renders, extracts DOM, runs diagnostics, writes files, checks stop conditions.
  */
 export async function initRollout(
+  session: RolloutSession,
+  initialIR: IRDocument
+): Promise<StepResult> {
+  if (session._busy) {
+    throw new Error("Session is busy — concurrent calls are not allowed");
+  }
+  session._busy = true;
+  try {
+  return await _initRolloutInner(session, initialIR);
+  } finally {
+    session._busy = false;
+  }
+}
+
+async function _initRolloutInner(
   session: RolloutSession,
   initialIR: IRDocument
 ): Promise<StepResult> {
@@ -162,6 +284,21 @@ export async function stepRollout(
   session: RolloutSession,
   patch: PatchDocument
 ): Promise<StepResult> {
+  if (session._busy) {
+    throw new Error("Session is busy — concurrent calls are not allowed");
+  }
+  session._busy = true;
+  try {
+  return await _stepRolloutInner(session, patch);
+  } finally {
+    session._busy = false;
+  }
+}
+
+async function _stepRolloutInner(
+  session: RolloutSession,
+  patch: PatchDocument
+): Promise<StepResult> {
   const iter = session.currentIter + 1;
   session.currentIter = iter;
 
@@ -224,6 +361,11 @@ export async function stepRollout(
       snapshot.totalSeverity >= prevSnapshot.totalSeverity
     ) {
       session.stallCount++;
+      // Record fingerprint of non-improving patch to taboo list
+      const fp = computeFingerprint(prevIR, patch);
+      if (fp !== "") {
+        session.tabooFingerprints.add(fp);
+      }
     } else {
       session.stallCount = 0;
     }
@@ -379,7 +521,7 @@ function buildMetrics(
   quality: QualityLabel
 ): RolloutMetrics {
   const lastSnapshot = session.history[session.history.length - 1]!;
-  return {
+  const metrics: RolloutMetrics = {
     defect_count_per_iter: session.history.map((s) => s.defectCount),
     total_severity_per_iter: session.history.map((s) => s.totalSeverity),
     warning_count_per_iter: session.history.map((s) => s.warningCount),
@@ -393,4 +535,10 @@ function buildMetrics(
     quality,
     budget_overrides: session.totalOverrides,
   };
+
+  if (session.tabooFingerprints.size > 0) {
+    metrics.taboo_fingerprints = [...session.tabooFingerprints];
+  }
+
+  return metrics;
 }

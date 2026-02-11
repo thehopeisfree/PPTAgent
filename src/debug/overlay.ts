@@ -230,8 +230,9 @@ function addSummaryPrimitives(
   const lines = [
     `Defects: ${s.defect_count}  Severity: ${s.total_severity}  Warnings: ${s.warning_count}`,
   ];
-  if (s.conflict_chain && s.conflict_chain.length > 0) {
-    lines.push(`Chain: ${s.conflict_chain.join(" \u2192 ")}`);
+  if (s.conflict_graph && s.conflict_graph.length > 0) {
+    const totalEdges = s.conflict_graph.reduce((n, c) => n + c.edges.length, 0);
+    lines.push(`Conflicts: ${s.conflict_graph.length} components, ${totalEdges} edges`);
   }
 
   const lineH = 16;

@@ -42,6 +42,7 @@ export const IRElementSchema = z.object({
   content: z.string(),
   layout: LayoutSchema,
   style: StyleSchema.default({}),
+  group: z.string().optional(),
 });
 export type IRElement = z.infer<typeof IRElementSchema>;
 

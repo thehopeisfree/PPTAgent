@@ -130,6 +130,127 @@ describe("applyPatch", () => {
     expect(overrides.length).toBeGreaterThan(0);
   });
 
+  // ── Image aspect ratio enforcement ──
+
+  it("auto-adjusts h when only w is patched on an image", () => {
+    const ir = parseIR({
+      slide: { w: 1280, h: 720 },
+      elements: [
+        {
+          eid: "img1",
+          type: "image",
+          priority: 40,
+          content: "photo.png",
+          layout: { x: 100, y: 100, w: 400, h: 300, zIndex: 10 },
+          style: {},
+        },
+      ],
+    });
+    // Patch only w: 400→200, ratio 4:3 → h should become 150
+    const patch = parsePatch({ edits: [{ eid: "img1", layout: { w: 200 } }] });
+    const { ir: result, overrides } = applyPatch(ir, patch);
+    const img = result.elements[0]!;
+    expect(img.layout.w).toBe(200);
+    expect(img.layout.h).toBe(150);
+    expect(overrides.some((o) => o.eid === "img1" && o.field === "layout.h")).toBe(true);
+  });
+
+  it("auto-adjusts w when only h is patched on an image", () => {
+    const ir = parseIR({
+      slide: { w: 1280, h: 720 },
+      elements: [
+        {
+          eid: "img1",
+          type: "image",
+          priority: 40,
+          content: "photo.png",
+          layout: { x: 100, y: 100, w: 400, h: 300, zIndex: 10 },
+          style: {},
+        },
+      ],
+    });
+    // Patch only h: 300→150, ratio 4:3 → w should become 200
+    const patch = parsePatch({ edits: [{ eid: "img1", layout: { h: 150 } }] });
+    const { ir: result, overrides } = applyPatch(ir, patch);
+    const img = result.elements[0]!;
+    expect(img.layout.h).toBe(150);
+    expect(img.layout.w).toBe(200);
+    expect(overrides.some((o) => o.eid === "img1" && o.field === "layout.w")).toBe(true);
+  });
+
+  it("does not override when both w and h are patched within tolerance", () => {
+    const ir = parseIR({
+      slide: { w: 1280, h: 720 },
+      elements: [
+        {
+          eid: "img1",
+          type: "image",
+          priority: 40,
+          content: "photo.png",
+          layout: { x: 100, y: 100, w: 400, h: 300, zIndex: 10 },
+          style: {},
+        },
+      ],
+    });
+    // Both patched, same ratio (4:3) → no override
+    const patch = parsePatch({ edits: [{ eid: "img1", layout: { w: 200, h: 150 } }] });
+    const { ir: result, overrides } = applyPatch(ir, patch);
+    const img = result.elements[0]!;
+    expect(img.layout.w).toBe(200);
+    expect(img.layout.h).toBe(150);
+    expect(overrides.filter((o) => o.reason.includes("aspect ratio"))).toHaveLength(0);
+  });
+
+  it("clamps h when both w and h are patched with distorted ratio", () => {
+    const ir = parseIR({
+      slide: { w: 1280, h: 720 },
+      elements: [
+        {
+          eid: "img1",
+          type: "image",
+          priority: 40,
+          content: "photo.png",
+          layout: { x: 100, y: 100, w: 400, h: 300, zIndex: 10 },
+          style: {},
+        },
+      ],
+    });
+    // Both patched, distorted (200×200 = 1:1, original 4:3) → h clamped to 150
+    const patch = parsePatch({ edits: [{ eid: "img1", layout: { w: 200, h: 200 } }] });
+    const { ir: result, overrides } = applyPatch(ir, patch);
+    const img = result.elements[0]!;
+    expect(img.layout.w).toBe(200);
+    expect(img.layout.h).toBe(150);
+    const ratioOverride = overrides.find((o) => o.reason.includes("aspect ratio"));
+    expect(ratioOverride).toBeDefined();
+    expect(ratioOverride!.field).toBe("layout.h");
+    expect(ratioOverride!.requested).toBe(200);
+    expect(ratioOverride!.clamped_to).toBe(150);
+  });
+
+  it("does not enforce aspect ratio on non-image elements", () => {
+    const ir = parseIR({
+      slide: { w: 1280, h: 720 },
+      elements: [
+        {
+          eid: "txt1",
+          type: "text",
+          priority: 40,
+          content: "Hello",
+          layout: { x: 100, y: 100, w: 400, h: 300, zIndex: 10 },
+          style: { fontSize: 16 },
+        },
+      ],
+    });
+    // Patch only w on a text element → h should NOT change
+    const patch = parsePatch({ edits: [{ eid: "txt1", layout: { w: 200 } }] });
+    const { ir: result, overrides } = applyPatch(ir, patch);
+    const txt = result.elements[0]!;
+    expect(txt.layout.w).toBe(200);
+    expect(txt.layout.h).toBe(300); // unchanged
+    expect(overrides.filter((o) => o.reason.includes("aspect ratio"))).toHaveLength(0);
+  });
+
   it("still enforces min font after budget clamping", () => {
     const ir = parseIR(sampleIR);
     // Bullets priority 80, fontSize 22. Budget allows down to 22*0.85=18.7

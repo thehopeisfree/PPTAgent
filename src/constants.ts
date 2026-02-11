@@ -45,8 +45,14 @@ export const MIN_FONT_BY_PRIORITY: ReadonlyMap<number, number> = new Map([
   [60, 16],
 ]);
 
+/** Severity for layout topology violations (structural, far above normal defects) */
+export const TOPOLOGY_SEVERITY = 5000;
+
 /** Text element types (used for severity multiplier) */
 export const TEXT_TYPES = new Set(["title", "text", "bullets"]);
+
+/** Tolerance for image aspect ratio deviation (1%) */
+export const IMAGE_ASPECT_RATIO_EPS = 0.01;
 
 /** Default zIndex for content elements */
 export const DEFAULT_Z_INDEX = 10;
