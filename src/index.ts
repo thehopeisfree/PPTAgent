@@ -99,3 +99,9 @@ export {
   rolloutPaths,
   writeFile,
 } from "./utils/fs-helpers.js";
+
+// Debug tools
+export { generateDebugHTML } from "./debug/visual-debug.js";
+export type { DebugSnapshot } from "./debug/visual-debug.js";
+export { injectDebugOverlay, toggleLayer, removeDebugOverlay } from "./debug/overlay.js";
+export type { OverlayOptions, OverlayLayer } from "./debug/overlay.js";
