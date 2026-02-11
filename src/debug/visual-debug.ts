@@ -16,6 +16,7 @@ export interface DebugSnapshot {
   patch?: PatchDocument;
   fingerprint?: string;
   tabooFingerprints?: string[];
+  rawHTML?: string;
 }
 
 /** Generate a self-contained debug HTML string */
@@ -31,7 +32,9 @@ export function generateDebugHTML(snapshots: DebugSnapshot[]): string {
   // Build per-iteration data
   const iterData = snapshots.map((snap, i) => ({
     iter: snap.iter,
-    slideHTML: extractSlideDiv(renderHTML(snap.ir)),
+    slideHTML: snap.rawHTML
+      ? extractSlideDiv(snap.rawHTML)
+      : extractSlideDiv(renderHTML(snap.ir)),
     overlays: buildOverlaySVG(snap, slideW, slideH) +
       (i > 0 ? buildDiffOverlay(snapshots[i - 1]!, snap, slideW, slideH) : ""),
     diagJSON: JSON.stringify(snap.diag, null, 2),

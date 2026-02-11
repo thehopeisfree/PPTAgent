@@ -114,5 +114,14 @@ export {
 // Debug tools
 export { generateDebugHTML } from "./debug/visual-debug.js";
 export type { DebugSnapshot } from "./debug/visual-debug.js";
+export { syntheticIRFromDOM } from "./debug/synthetic-ir.js";
+export type { InputElement } from "./debug/synthetic-ir.js";
 export { injectDebugOverlay, toggleLayer, removeDebugOverlay } from "./debug/overlay.js";
 export type { OverlayOptions, OverlayLayer } from "./debug/overlay.js";
+
+// Flatten (flexbox → absolute)
+export { flattenHTML } from "./flatten/flatten-html.js";
+export type { FlattenedElement } from "./flatten/flatten-html.js";
+
+// PPTX conversion
+export { htmlToPptx, htmlToPptxFile, htmlToPptxBuffer } from "./pptx/html-to-pptx.js";
