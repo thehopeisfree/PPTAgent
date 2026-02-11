@@ -1,0 +1,21 @@
+{
+  "slide": { "w": 1280, "h": 720 },
+  "elements": [
+    {
+      "eid": "e_title_001",
+      "type": "title",
+      "priority": 100,
+      "content": "A Very Long Title That Should Overflow The Container Box",
+      "layout": { "x": 48, "y": 32, "w": 300, "h": 50, "zIndex": 10 },
+      "style": { "fontSize": 44, "lineHeight": 1.2 }
+    },
+    {
+      "eid": "e_text_002",
+      "type": "text",
+      "priority": 60,
+      "content": "Line 1\nLine 2\nLine 3\nLine 4\nLine 5\nLine 6\nLine 7\nLine 8\nLine 9\nLine 10",
+      "layout": { "x": 48, "y": 120, "w": 400, "h": 100, "zIndex": 10 },
+      "style": { "fontSize": 16, "lineHeight": 1.5 }
+    }
+  ]
+}

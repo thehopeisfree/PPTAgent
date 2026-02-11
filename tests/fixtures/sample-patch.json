@@ -1,0 +1,10 @@
+{
+  "edits": [
+    {
+      "eid": "e_bullets_002",
+      "layout": { "y": 120, "h": 570 },
+      "style": { "fontSize": 20 }
+    }
+  ],
+  "constraints": { "no_add_remove": true }
+}

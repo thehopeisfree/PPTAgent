@@ -1,0 +1,29 @@
+{
+  "slide": { "w": 1280, "h": 720 },
+  "elements": [
+    {
+      "eid": "e_bg_001",
+      "type": "decoration",
+      "priority": 20,
+      "content": "",
+      "layout": { "x": 0, "y": 0, "w": 400, "h": 720, "zIndex": 0 },
+      "style": { "backgroundColor": "#f0f0f0" }
+    },
+    {
+      "eid": "e_title_001",
+      "type": "title",
+      "priority": 100,
+      "content": "Key Findings",
+      "layout": { "x": 48, "y": 32, "w": 1184, "h": 80, "zIndex": 10 },
+      "style": { "fontSize": 44, "lineHeight": 1.2 }
+    },
+    {
+      "eid": "e_bullets_002",
+      "type": "bullets",
+      "priority": 80,
+      "content": "• Point A\n• Point B\n• Point C",
+      "layout": { "x": 64, "y": 140, "w": 820, "h": 520, "zIndex": 10 },
+      "style": { "fontSize": 22, "lineHeight": 1.5 }
+    }
+  ]
+}
