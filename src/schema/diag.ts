@@ -120,6 +120,7 @@ export interface DiagSummary {
   defect_count: number;
   total_severity: number;
   warning_count: number;
+  warning_severity: number;
   conflict_graph?: ConflictComponent[];
 }
 

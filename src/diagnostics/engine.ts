@@ -68,10 +68,17 @@ export function diagnose(dom: DOMDocument, ir: IRDocument): DiagDocument {
   // Compute severity
   const severity = totalSeverity(defects);
 
+  // Compute warning severity (sum of overlap areas from warnings)
+  let warningSeverity = 0;
+  for (const w of warnings) {
+    warningSeverity += w.details.overlap_area_px;
+  }
+
   const summary: DiagDocument["summary"] = {
     defect_count: defects.length,
     total_severity: severity,
     warning_count: warnings.length,
+    warning_severity: warningSeverity,
   };
 
   if (conflictGraph.length > 0) {

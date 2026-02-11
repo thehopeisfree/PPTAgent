@@ -86,6 +86,7 @@ export {
   stepRollout,
   computeFingerprint,
   checkPatch,
+  buildStorySoFar,
 } from "./driver/loop-driver.js";
 export type { RolloutSession, StepResult, CheckPatchResult } from "./driver/loop-driver.js";
 

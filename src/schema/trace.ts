@@ -25,6 +25,7 @@ export interface TraceEntry {
   defect_count: number;
   total_severity: number;
   warning_count: number;
+  warning_severity: number;
   defect_types: DefectType[];
   warning_types?: WarningType[];
   action: string;

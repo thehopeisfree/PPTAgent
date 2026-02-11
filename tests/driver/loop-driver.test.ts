@@ -9,6 +9,7 @@ import {
   stepRollout,
   computeFingerprint,
   checkPatch,
+  buildStorySoFar,
 } from "../../src/driver/loop-driver.js";
 import { parseIR } from "../../src/schema/ir.js";
 import { parsePatch } from "../../src/schema/patch.js";
@@ -390,10 +391,11 @@ describe("checkPatch", () => {
     session.history.push({
       iter: 0,
       ir: baseIR,
-      diag: { defects: [], warnings: [], summary: { defect_count: 0, total_severity: 0, warning_count: 0 } },
+      diag: { defects: [], warnings: [], summary: { defect_count: 0, total_severity: 0, warning_count: 0, warning_severity: 0 } },
       defectCount: 0,
       totalSeverity: 0,
       warningCount: 0,
+      warningSeverity: 0,
     });
 
     const patch = parsePatch({
@@ -410,10 +412,11 @@ describe("checkPatch", () => {
     session.history.push({
       iter: 0,
       ir: baseIR,
-      diag: { defects: [], warnings: [], summary: { defect_count: 0, total_severity: 0, warning_count: 0 } },
+      diag: { defects: [], warnings: [], summary: { defect_count: 0, total_severity: 0, warning_count: 0, warning_severity: 0 } },
       defectCount: 0,
       totalSeverity: 0,
       warningCount: 0,
+      warningSeverity: 0,
     });
 
     const patch = parsePatch({
@@ -439,5 +442,100 @@ describe("checkPatch", () => {
     const result = checkPatch(session, patch);
     expect(result.allowed).toBe(true);
     expect(result.fingerprint).toBe("");
+  });
+});
+
+describe("buildStorySoFar", () => {
+  const fakePage = null as unknown as Page;
+
+  const baseIR = parseIR({
+    slide: { w: 1280, h: 720 },
+    elements: [
+      {
+        eid: "e1",
+        type: "title",
+        priority: 100,
+        content: "Title",
+        layout: { x: 48, y: 32, w: 400, h: 80, zIndex: 10 },
+        style: { fontSize: 44, lineHeight: 1.2 },
+      },
+    ],
+  });
+
+  const makeDiag = (defectCount: number, severity: number, warningCount = 0, warningSeverity = 0) => ({
+    defects: defectCount > 0 ? [{ type: "overlap" as const, owner_eid: "e1", other_eid: "e2", severity, details: { overlap_area_px: severity } }] : [],
+    warnings: [],
+    summary: { defect_count: defectCount, total_severity: severity, warning_count: warningCount, warning_severity: warningSeverity },
+  });
+
+  it("returns empty string with no history", () => {
+    const session = createSession(fakePage, "/tmp/test");
+    expect(buildStorySoFar(session)).toBe("");
+  });
+
+  it("returns empty string with only 1 iteration", () => {
+    const session = createSession(fakePage, "/tmp/test");
+    session.history.push({
+      iter: 0, ir: baseIR, diag: makeDiag(2, 500),
+      defectCount: 2, totalSeverity: 500, warningCount: 0, warningSeverity: 0,
+    });
+    expect(buildStorySoFar(session)).toBe("");
+  });
+
+  it("includes non-improving iterations", () => {
+    const session = createSession(fakePage, "/tmp/test");
+    session.history.push({
+      iter: 0, ir: baseIR, diag: makeDiag(2, 500),
+      defectCount: 2, totalSeverity: 500, warningCount: 0, warningSeverity: 0,
+    });
+    session.history.push({
+      iter: 1, ir: baseIR, diag: makeDiag(2, 600),
+      defectCount: 2, totalSeverity: 600, warningCount: 0, warningSeverity: 0,
+    });
+
+    const story = buildStorySoFar(session);
+    expect(story).toContain("STORY SO FAR");
+    expect(story).toContain("iter 1");
+    expect(story).toContain("no improvement");
+  });
+
+  it("includes taboo fingerprints", () => {
+    const session = createSession(fakePage, "/tmp/test");
+    session.history.push({
+      iter: 0, ir: baseIR, diag: makeDiag(2, 500),
+      defectCount: 2, totalSeverity: 500, warningCount: 0, warningSeverity: 0,
+    });
+    session.history.push({
+      iter: 1, ir: baseIR, diag: makeDiag(1, 200),
+      defectCount: 1, totalSeverity: 200, warningCount: 0, warningSeverity: 0,
+    });
+    session.tabooFingerprints.add("e1:move:down");
+
+    const story = buildStorySoFar(session);
+    expect(story).toContain("taboo");
+    expect(story).toContain("e1");
+    expect(story).toContain("move");
+    expect(story).toContain("down");
+  });
+
+  it("shows current state and best state", () => {
+    const session = createSession(fakePage, "/tmp/test");
+    session.history.push({
+      iter: 0, ir: baseIR, diag: makeDiag(3, 800),
+      defectCount: 3, totalSeverity: 800, warningCount: 0, warningSeverity: 0,
+    });
+    session.history.push({
+      iter: 1, ir: baseIR, diag: makeDiag(1, 200),
+      defectCount: 1, totalSeverity: 200, warningCount: 0, warningSeverity: 0,
+    });
+    session.history.push({
+      iter: 2, ir: baseIR, diag: makeDiag(2, 500),
+      defectCount: 2, totalSeverity: 500, warningCount: 0, warningSeverity: 0,
+    });
+    session.bestIter = 1;
+
+    const story = buildStorySoFar(session);
+    expect(story).toContain("Current: iter 2");
+    expect(story).toContain("Best so far: iter 1");
   });
 });

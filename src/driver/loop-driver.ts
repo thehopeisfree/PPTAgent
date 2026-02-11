@@ -29,6 +29,7 @@ interface IterationSnapshot {
   defectCount: number;
   totalSeverity: number;
   warningCount: number;
+  warningSeverity: number;
 }
 
 /** The result of a single step in the refinement loop */
@@ -236,6 +237,7 @@ async function _initRolloutInner(
     defectCount: diag.summary.defect_count,
     totalSeverity: diag.summary.total_severity,
     warningCount: diag.summary.warning_count,
+    warningSeverity: diag.summary.warning_severity,
   };
   session.history.push(snapshot);
 
@@ -245,6 +247,7 @@ async function _initRolloutInner(
     defect_count: diag.summary.defect_count,
     total_severity: diag.summary.total_severity,
     warning_count: diag.summary.warning_count,
+    warning_severity: diag.summary.warning_severity,
     defect_types: [...new Set(diag.defects.map((d) => d.type))],
     warning_types: [...new Set(diag.warnings.map((w) => w.type))],
     action: diag.summary.defect_count === 0 ? "stop_success" : "init",
@@ -342,15 +345,19 @@ async function _stepRolloutInner(
     defectCount: diag.summary.defect_count,
     totalSeverity: diag.summary.total_severity,
     warningCount: diag.summary.warning_count,
+    warningSeverity: diag.summary.warning_severity,
   };
   session.history.push(snapshot);
 
-  // Update best
+  // Update best (lexicographic: severity → defect_count → warning_severity)
   const best = session.history[session.bestIter]!;
   if (
     snapshot.totalSeverity < best.totalSeverity ||
     (snapshot.totalSeverity === best.totalSeverity &&
-      snapshot.defectCount < best.defectCount)
+      snapshot.defectCount < best.defectCount) ||
+    (snapshot.totalSeverity === best.totalSeverity &&
+      snapshot.defectCount === best.defectCount &&
+      snapshot.warningSeverity < best.warningSeverity)
   ) {
     session.bestIter = session.history.length - 1;
     session.stallCount = 0;
@@ -378,6 +385,7 @@ async function _stepRolloutInner(
     defect_count: diag.summary.defect_count,
     total_severity: diag.summary.total_severity,
     warning_count: diag.summary.warning_count,
+    warning_severity: diag.summary.warning_severity,
     defect_types: [...new Set(diag.defects.map((d) => d.type))],
     warning_types: [...new Set(diag.warnings.map((w) => w.type))],
     action,
@@ -541,4 +549,65 @@ function buildMetrics(
   }
 
   return metrics;
+}
+
+/**
+ * Build a concise "story so far" summary for prompt injection.
+ * Summarizes the last few non-improving iterations so the model
+ * knows what was tried and why it failed.
+ *
+ * Returns empty string if there's no useful history (0 or 1 iterations).
+ */
+export function buildStorySoFar(session: RolloutSession): string {
+  if (session.history.length < 2) return "";
+
+  const lines: string[] = ["=== STORY SO FAR ==="];
+
+  // Collect non-improving iterations (severity/defect didn't improve vs previous)
+  const failures: { iter: number; defects: string; severity: number; prevSeverity: number }[] = [];
+  for (let i = 1; i < session.history.length; i++) {
+    const curr = session.history[i]!;
+    const prev = session.history[i - 1]!;
+    if (curr.totalSeverity >= prev.totalSeverity && curr.defectCount >= prev.defectCount) {
+      failures.push({
+        iter: curr.iter,
+        defects: [...new Set(curr.diag.defects.map((d) => d.type))].join(", "),
+        severity: curr.totalSeverity,
+        prevSeverity: prev.totalSeverity,
+      });
+    }
+  }
+
+  // Show last 3 failures max
+  const recent = failures.slice(-3);
+  if (recent.length > 0) {
+    lines.push("Recent non-improving iterations (do NOT repeat these strategies):");
+    for (const f of recent) {
+      lines.push(`  iter ${f.iter}: severity ${f.prevSeverity} -> ${f.severity} (no improvement). Remaining: [${f.defects}]`);
+    }
+  }
+
+  // Show taboo fingerprints as learned constraints
+  if (session.tabooFingerprints.size > 0) {
+    lines.push("");
+    lines.push("Failed strategies (taboo):");
+    for (const fp of session.tabooFingerprints) {
+      const actions = fp.split("|").map((sig) => {
+        const [eid, action, dir] = sig.split(":");
+        return `  ${eid}: ${action} ${dir}`;
+      });
+      lines.push(...actions);
+    }
+  }
+
+  // Current state summary
+  const latest = session.history[session.history.length - 1]!;
+  const best = session.history[session.bestIter]!;
+  lines.push("");
+  lines.push(`Current: iter ${latest.iter}, ${latest.defectCount} defects, severity ${latest.totalSeverity}, ${latest.warningCount} warnings`);
+  if (session.bestIter !== session.history.length - 1) {
+    lines.push(`Best so far: iter ${best.iter}, ${best.defectCount} defects, severity ${best.totalSeverity}`);
+  }
+
+  return lines.join("\n");
 }
