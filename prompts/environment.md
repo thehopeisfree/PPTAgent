@@ -2,6 +2,8 @@
 
 You are in a CaaS container with Node.js and system Chromium.
 
+**IMPORTANT:** Before generating any slide HTML, read `/shared/pptagent-skill.md` for the complete API reference, defect types, hint format, and HTML rules.
+
 ## PPTAgent Location
 
 PPTAgent is pre-installed at `/tools/pptagent`. Import from the compiled package:

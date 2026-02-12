@@ -8,6 +8,7 @@
 #   package.json          dependency manifest
 #   package-lock.json     lockfile for reproducible installs
 #   SKILL.md              model context document
+#   prompts/              prompt templates (loaded by framework)
 #   scripts/container-setup.sh
 #
 # Default output: pptagent.tar.gz in the repo root.
@@ -37,6 +38,7 @@ tar czf "$OUTPUT" \
   package.json \
   package-lock.json \
   SKILL.md \
+  prompts/ \
   scripts/container-setup.sh
 
 SIZE=$(du -h "$OUTPUT" | cut -f1)
