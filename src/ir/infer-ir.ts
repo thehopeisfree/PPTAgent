@@ -14,7 +14,7 @@ export interface TypeSignal {
   hasList: boolean;
   /** Has non-whitespace text content */
   hasText: boolean;
-  /** Has a visible background-color (not transparent) */
+  /** Has a visible background (color, gradient, or image) */
   hasBg: boolean;
   /** Computed font-weight (numeric, e.g. 400, 700) */
   fontWeight: number;
@@ -36,9 +36,12 @@ const TYPE_SIGNAL_SCRIPT = `(() => {
     for (const img of clone.querySelectorAll('img')) img.remove();
     const hasText = clone.textContent.trim().length > 0;
 
-    // Check background-color
-    const bg = window.getComputedStyle(el).backgroundColor;
-    const hasBg = bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent';
+    // Check background (color, gradient, or image)
+    const computed = window.getComputedStyle(el);
+    const bg = computed.backgroundColor;
+    const bgImg = computed.backgroundImage;
+    const hasBg = (bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent')
+               || (bgImg !== 'none' && bgImg !== '');
 
     // Font weight (always numeric in computed style)
     const fontWeight = parseInt(window.getComputedStyle(el).fontWeight, 10) || 400;

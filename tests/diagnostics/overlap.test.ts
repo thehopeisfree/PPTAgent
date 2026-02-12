@@ -212,6 +212,40 @@ describe("overlap detector", () => {
     expect(warnings).toHaveLength(0);
   });
 
+  it("caps hint with suggested_w when move would breach edge proximity", () => {
+    // e1 (high priority) is a tall element; e2 (low priority) slightly overlaps
+    // on the right. move_right is the cheapest separation (66px), but it pushes
+    // e2's trailing edge to 1116+200=1316 > SLIDE_W-EDGE_MARGIN_PX (1256).
+    // The hint must include suggested_w to cap the trailing edge.
+    const domEls: DOMElement[] = [
+      makeDOMEl({
+        eid: "e1",
+        bbox: { x: 1000, y: 100, w: 100, h: 300 },
+        safeBox: { x: 992, y: 92, w: 116, h: 316 },
+        zIndex: 10,
+      }),
+      makeDOMEl({
+        eid: "e2",
+        bbox: { x: 1050, y: 200, w: 200, h: 50 },
+        safeBox: { x: 1042, y: 192, w: 216, h: 66 },
+        zIndex: 10,
+      }),
+    ];
+    const irEls: IRElement[] = [
+      makeIREl({ eid: "e1", priority: 100 }),
+      makeIREl({ eid: "e2", priority: 60 }),
+    ];
+
+    const { defects } = detectOverlaps(domEls, irEls);
+    expect(defects).toHaveLength(1);
+    const hint = defects[0]!.hint!;
+    expect(hint.validated).toBe(true);
+    expect(hint.suggested_x).toBeDefined();
+    expect(hint.suggested_w).toBeDefined();
+    // Trailing edge must respect EDGE_MARGIN_PX (24)
+    expect(hint.suggested_x! + hint.suggested_w!).toBeLessThanOrEqual(1280 - 24);
+  });
+
   it("still detects overlap between elements in different groups", () => {
     const domEls: DOMElement[] = [
       makeDOMEl({

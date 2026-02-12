@@ -5,6 +5,9 @@ import {
   MIN_OVERLAP_AREA_PX,
   TEXT_OVERLAP_SEVERITY_MULT,
   TEXT_TYPES,
+  EDGE_MARGIN_PX,
+  SLIDE_W,
+  SLIDE_H,
 } from "../../constants.js";
 import { intersectionArea } from "../../utils/geometry.js";
 import { computeSeparationOptions } from "../hints/separation-calculator.js";
@@ -134,6 +137,17 @@ function computeMoveHint(owner: DOMElement, other: DOMElement): Hint {
   };
   if (best.target_y != null) hint.suggested_y = best.target_y;
   if (best.target_x != null) hint.suggested_x = best.target_x;
+
+  // Edge-proximity awareness: cap size so trailing edge stays within margin
+  const newX = hint.suggested_x ?? owner.bbox.x;
+  const newY = hint.suggested_y ?? owner.bbox.y;
+
+  if (newX + owner.bbox.w > SLIDE_W - EDGE_MARGIN_PX) {
+    hint.suggested_w = Math.max(1, SLIDE_W - EDGE_MARGIN_PX - newX);
+  }
+  if (newY + owner.bbox.h > SLIDE_H - EDGE_MARGIN_PX) {
+    hint.suggested_h = Math.max(1, SLIDE_H - EDGE_MARGIN_PX - newY);
+  }
 
   return hint;
 }
