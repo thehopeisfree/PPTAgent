@@ -22,7 +22,7 @@ Description → HTML (flexbox) → Flatten → Absolute HTML → Playwright Rend
 - [Architecture](#architecture)
 - [Core Computation Logic](#core-computation-logic)
 - [Deployment](#deployment)
-- [RL Container Integration](#rl-container-integration)
+- [Programmatic API](#programmatic-api)
 - [Quick Start](#quick-start)
 - [CLI Scripts](#cli-scripts)
 - [Project Structure](#project-structure)
@@ -73,67 +73,38 @@ Making priority dynamic would create feedback instability — lowering priority 
 
 ## Architecture
 
-### Core Modules
+The model interacts with PPTAgent through CLI scripts. The internal pipeline:
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                        Loop Driver                               │
-│  createSession → initRollout → [stepRollout × N] → StepResult   │
-│                                                                  │
-│  Convergence: success | stall (rollback) | max_iter (fallback)   │
-│  Anti-repeat: patch fingerprinting → taboo set                   │
-└──────┬─────────────────┬──────────────────┬─────────────────────┘
-       │                 │                  │
-       ▼                 ▼                  ▼
-  ┌─────────┐     ┌────────────┐     ┌──────────────┐
-  │  Patch   │     │  Renderer  │     │  Diagnostics │
-  │  Apply   │     │  (HTML)    │     │   Engine     │
-  │          │     │            │     │              │
-  │ Budget   │     │ IR → HTML  │     │ 5 detectors  │
-  │ Clamp    │     │ data-eid   │     │ + hints      │
-  │ Ratio    │     │ positioning│     │ + conflict   │
-  │ Enforce  │     │            │     │   graph      │
-  └─────────┘     └─────┬──────┘     └──────▲───────┘
-                        │                    │
-                        ▼                    │
-                  ┌───────────┐              │
-                  │ Playwright │              │
-                  │ DOM Extract│──────────────┘
-                  │            │
-                  │ Range API  │
-                  │ Slide-local│
-                  └────────────┘
+┌──────────┐     ┌──────────┐     ┌──────────────┐
+│ Flatten   │     │ DOM      │     │ Diagnostics  │
+│           │     │ Extract  │     │   Engine     │
+│ flexbox → │     │          │     │              │
+│ absolute  │     │ Playwright│     │ 5 detectors  │
+│           │     │ Range API │     │ + hints      │
+│           │     │ slide-local│    │ + conflict   │
+└──────────┘     └─────┬──────┘    └──────▲───────┘
+                       │                   │
+                       ▼                   │
+                 ┌───────────┐             │
+                 │ IR Infer  │─────────────┘
+                 │ (auto)    │
+                 └───────────┘
+
+┌──────────┐     ┌──────────┐
+│ PPTX     │     │ Patch    │
+│ Convert  │     │ Apply    │
+│           │     │          │
+│ HTML →    │     │ budget   │
+│ pptxgenjs │     │ clamp    │
+└──────────┘     └──────────┘
 ```
 
-**1. IR Schema** (`src/schema/ir.ts`) — Each slide element: `eid`, `type`, `priority` (0-100), `content`, `layout` (x, y, w, h, zIndex), `style` (fontSize, lineHeight, ...). All coordinates slide-local on a 1280x720 canvas. Element types: `title`, `bullets`, `image`, `text`, `decoration`. Validated with Zod.
+**Flatten** (`src/flatten/flatten-html.ts`) — Converts flexbox/grid HTML to absolute-positioned HTML. Renders in Playwright, reads computed positions for each `[data-eid]` element, rewrites to `position: absolute` with `overflow: visible`. One-way transform.
 
-**2. HTML Renderer** (`src/renderer/html-renderer.ts`) — Converts IR to standalone HTML. Each element becomes an absolutely-positioned `<div>` with `data-eid`. Bullets render as `<ul><li>`, images as `<img>`. Overflow set to `visible` so content measurement is accurate.
+**DOM Extraction** (`src/extraction/dom-extractor.ts`) — Playwright evaluates a script in the browser context. For each `[data-eid]` element, extracts `bbox` (via `getBoundingClientRect`), `contentBox` (via Range API `getClientRects()` union — NOT `scrollHeight`), and computed styles. All coordinates are slide-local. `safeBox` = bbox inflated by `SAFE_PADDING` (8px) per side.
 
-**3. DOM Extraction** (`src/extraction/dom-extractor.ts`) — Playwright evaluates a script in the browser context. For each `[data-eid]` element, extracts `bbox` (via `getBoundingClientRect`), `contentBox` (via Range API `getClientRects()` union — NOT `scrollHeight`), and computed styles. All coordinates are slide-local (subtracting the `#slide` container offset). `safeBox` = bbox inflated by `SAFE_PADDING` (8px) per side.
-
-**4. Diagnostics Engine** (`src/diagnostics/engine.ts`) — Runs 5 detectors in fix-priority order, validates all hints, builds conflict graph:
-
-| Detector | Trigger | Severity |
-|---|---|---|
-| `layout_topology` | Title center-y below body center-y | 5000 (fixed) |
-| `font_too_small` | fontSize below priority tier minimum | (min - current) x 10 |
-| `content_overflow` | contentBox exceeds bbox | overflow_x + overflow_y px |
-| `out_of_bounds` | Element exceeds slide bounds | by_px per edge |
-| `overlap` | SafeBox intersection >= 100px², same zIndex | area x 2 if text involved |
-
-Plus `occlusion_suspected` warnings for cross-zIndex overlaps (informational only, doesn't count as defect).
-
-**5. Patch Apply** (`src/patch/apply-patch.ts`) — Shallow-merges patch into IR with enforcement:
-- **Dual budget** on priority >= 80: size props (w, h, fontSize, lineHeight) capped at 15% change; position props (x, y) capped at 48px
-- **Image aspect ratio**: auto-adjusts the other dimension when w or h is patched alone; corrects distortion when both are patched beyond 1% tolerance
-- **Min font floor**: fontSize never drops below priority tier minimum
-- **Slide bounds clamp**: final layout clamped to [0, 1280] x [0, 720]
-
-All enforcement is logged as `Override` records in the trace.
-
-**6. Flatten** (`src/flatten/flatten-html.ts`) — Converts flexbox/grid HTML to absolute-positioned HTML. Renders in Playwright, reads computed `left`, `top`, `width`, `height` for each `[data-eid]` element, rewrites to `position: absolute` with `overflow: visible`. One-way transform; after flattening, all edits happen on the absolute HTML.
-
-**7. IR Inference** (`src/ir/infer-ir.ts`) — Auto-generates a minimal IR document from rendered HTML when no `input.json` is provided. Runs a browser script to extract structural signals (has `<img>`, has `<ul>`, has background, font weight), then infers `type` and `priority`:
+**IR Inference** (`src/ir/infer-ir.ts`) — Auto-generates a minimal IR from rendered HTML when no `input.json` is provided. Infers `type` and `priority` from HTML structure:
 
 | HTML pattern | Inferred type | Priority |
 |---|---|---|
@@ -143,36 +114,36 @@ All enforcement is logged as `Override` records in the trace.
 | Bold + font >= 28px | `title` | 100 |
 | Everything else | `text` | 60 |
 
-Diagnostics only uses `eid`, `type`, and `priority` from the IR — `content`, `layout`, and `style` are not read by the diagnostics engine (it uses DOM-extracted values instead).
+Diagnostics only reads `eid`, `type`, and `priority` from the IR — it uses DOM-extracted values for everything else.
 
-**8. PPTX Conversion** (`src/pptx/html-to-pptx.ts`) — Renders HTML in Playwright, extracts element bounding boxes/styles/text, then uses pptxgenjs to build a PowerPoint file. Maps elements to PPTX primitives: decoration → `addShape`, text/title → `addText`, bullets → `addText` with bullet markers, image → `addImage`. Conversion: 1280px = 10", so 1px = 0.0078125". Accepts either `(html, outputPath)` for standalone use or `(page, html, outputPath)` to reuse an existing browser page.
+**Diagnostics Engine** (`src/diagnostics/engine.ts`) — Runs 5 detectors in fix-priority order, validates all hints, builds conflict graph:
 
-**9. Loop Driver** (`src/driver/loop-driver.ts`) — Session-based refinement loop:
-- **Stop on success**: `defect_count == 0`
-- **Stop on stall**: 2 consecutive non-improving iterations (both defect_count and severity) -> rollback to best prior IR
-- **Stop on max iterations** (3): apply hard fallback (truncate, optionally hide lowest-priority element)
-- **Anti-repeat memory**: non-improving patches fingerprinted -> taboo set; `checkPatch()` rejects repeated strategies
-- **Quality labels**: `success_clean` | `success_with_warnings` | `degraded`
+| Detector | Trigger | Severity |
+|---|---|---|
+| `layout_topology` | Title center-y below body center-y | 5000 (fixed) |
+| `font_too_small` | fontSize below priority tier minimum | (min - current) x 10 |
+| `content_overflow` | contentBox exceeds bbox | overflow_x + overflow_y px |
+| `out_of_bounds` | Element exceeds slide bounds | by_px per edge |
+| `overlap` | SafeBox intersection >= 100px², same zIndex | area x 2 if text involved |
 
-### Data Flow Per Iteration
+Plus `occlusion_suspected` warnings for cross-zIndex overlaps (informational only).
+
+**PPTX Conversion** (`src/pptx/html-to-pptx.ts`) — Renders HTML in Playwright, extracts bounding boxes/styles/text, builds PowerPoint via pptxgenjs. Accepts `(html, outputPath)` for standalone use or `(page, html, outputPath)` to reuse an existing browser.
+
+**Patch Apply** (`src/patch/apply-patch.ts`) — Shallow-merges patch into IR with enforcement. Used by the programmatic API (see below), not the CLI workflow.
+
+### Rollout Artifacts
+
+Each validation iteration saves artifacts to the rollout directory:
 
 ```
-rollouts/rollout_XXXX/
-├── ir_0.json        <- Initial IR
+<rolloutDir>/
 ├── out_0.html       <- Rendered HTML
 ├── render_0.png     <- Screenshot
 ├── dom_0.json       <- Extracted measurements
 ├── diag_0.json      <- Defects + hints + conflict graph
-│
-├── patch_1.json     <- LLM-generated patch
-├── ir_1.json        <- Patched IR (after budget clamping)
-├── out_1.html
-├── render_1.png
-├── dom_1.json
-├── diag_1.json
-│
-├── ...              <- Repeats up to MAX_ITER
-└── trace.jsonl      <- One JSON line per iteration (convergence metrics)
+├── out_1.html       <- After fixing
+├── ...
 ```
 
 ---
@@ -260,32 +231,6 @@ When a patch modifies an image element's dimensions:
 
 Runs after budget clamping but before slide bounds clamping.
 
-### Stall Detection & Rollback
-
-```
-After each iteration:
-  if defect_count did not decrease AND total_severity did not decrease:
-    stallCount++
-    add patch fingerprint to taboo set
-  else:
-    stallCount = 0
-
-  if stallCount >= 2:
-    rollback to best prior IR (lowest severity, tie-break lowest defect_count)
-    stop with quality = "degraded"
-```
-
-Both metrics must fail to improve — this prevents premature rollback when the model makes a strategic trade-off (e.g., temporarily increasing defect count to resolve a higher-severity issue).
-
-### Patch Fingerprinting
-
-Each patch edit generates direction signatures:
-```
-e_title:move:down | e_bullets:resize_h:shrink | e_image:font:decrease
-```
-
-Sorted, deduplicated, joined with `|`. Non-improving patches are added to a session-scoped taboo set. `checkPatch()` rejects repeated strategies before they're applied.
-
 ---
 
 ## Deployment
@@ -319,112 +264,35 @@ bash /tools/pptagent/scripts/container-setup.sh
 
 ---
 
-## RL Container Integration
+## Programmatic API
 
-In an RL training setup, PPTAgent runs inside the container as the **environment**. The model is the **agent**. The loop looks like this:
-
-### Per-Episode Loop
+For frameworks that want to drive the refinement loop programmatically (e.g., RL training), the core modules are also available as a Node.js library:
 
 ```typescript
 import {
-  parseIR,
-  parsePatch,
-  createSession,
-  initRollout,
-  stepRollout,
-  checkPatch,
-  launchBrowser,
+  parseIR, parsePatch, createSession,
+  initRollout, stepRollout, launchBrowser,
 } from "pptagent";
 
-// 1. Launch browser (once per container, reuse across episodes)
-const browser = await launchBrowser();  // uses CHROMIUM_PATH if set
+const browser = await launchBrowser();
 const page = await browser.newPage();
 await page.setViewportSize({ width: 1920, height: 1080 });
 
-// 2. Start episode
-const ir = parseIR(inputJSON);  // from dataset
+const ir = parseIR(inputJSON);
 const session = createSession(page, `rollouts/rollout_${id}`);
 const step0 = await initRollout(session, ir);
 
-if (step0.stopped) {
-  // Already clean — no defects
-  return step0.metrics;
-}
-
-// 3. Refinement loop — model is the agent
 let currentStep = step0;
 while (!currentStep.stopped) {
-  // Feed diagnostics to model, get patch back
   const patch = await callModel(currentStep.diag, currentStep.ir);
-  const parsedPatch = parsePatch(patch);
-
-  // Check taboo list
-  const check = checkPatch(session, parsedPatch);
-  if (!check.allowed) {
-    // Tell model to try a different strategy
-    const retry = await callModel(
-      currentStep.diag, currentStep.ir, check.reason
-    );
-    currentStep = await stepRollout(session, parsePatch(retry));
-  } else {
-    currentStep = await stepRollout(session, parsedPatch);
-  }
+  currentStep = await stepRollout(session, parsePatch(patch));
 }
 
-// 4. Episode done — extract reward signal
 const { quality, metrics } = currentStep;
 // quality: "success_clean" | "success_with_warnings" | "degraded"
-// metrics.defect_count_per_iter:    [5, 2, 0]
-// metrics.total_severity_per_iter:  [3400, 800, 0]
-// metrics.iterations_to_converge:   2
-// metrics.budget_overrides:         1
 ```
 
-### Reward Design
-
-The system provides multiple signals for reward shaping:
-
-| Signal | Source | Usage |
-|---|---|---|
-| `quality` | Final label | Sparse terminal reward: clean > warnings > degraded |
-| `defect_count` drop | Per-iteration | Dense step reward: proportional to defects resolved |
-| `total_severity` drop | Per-iteration | Weighted step reward: accounts for defect importance |
-| `iterations_to_converge` | Final metrics | Efficiency bonus: fewer steps = better |
-| `budget_overrides` | Final metrics | Penalty: patches that require clamping (model should learn to respect budgets) |
-| `taboo_fingerprints` | Final metrics | Penalty: repeated failed strategies |
-
-### What the Model Sees (Observation Space)
-
-At each step, the model receives:
-
-1. **Current IR** — the full element definitions with layout and style
-2. **Diagnostics** (`diag_k.json`) containing:
-   - Defect list with type, severity, involved elements, and calculated hints
-   - Warning list (cross-zIndex occlusion)
-   - Conflict graph with separation options and space envelopes
-   - Summary: defect_count, total_severity, warning_count
-
-### What the Model Outputs (Action Space)
-
-A JSON patch document:
-```json
-{
-  "edits": [
-    { "eid": "e_bullets", "layout": { "y": 120, "h": 570 } },
-    { "eid": "e_image", "layout": { "w": 300 } },
-    { "eid": "e_caption", "style": { "fontSize": 16 } }
-  ]
-}
-```
-
-The system enforces all constraints post-hoc — the model doesn't need to self-police budgets, aspect ratios, or bounds. It just needs to produce directionally correct patches.
-
-### Scaling
-
-- One browser instance per container, one page per episode
-- `createSession()` is lightweight state initialization
-- DOM extraction + diagnostics take ~50ms per iteration
-- Typical episode: 1-3 iterations = 50-150ms of tool time (model inference dominates)
+The loop driver handles stall detection, rollback to best prior state, patch fingerprinting (taboo set for repeated strategies), and budget enforcement. See `src/driver/loop-driver.ts` for details.
 
 ---
 
@@ -592,15 +460,13 @@ These are included in the deployment tarball. `container-setup.sh` copies `SKILL
 3. Wire it into `src/diagnostics/engine.ts` at the appropriate position in the fix-priority order
 4. Add tests in `tests/diagnostics/`
 
-### Tuning Hint Richness (Difficulty Knob for RL)
+### Tuning Hint Richness
 
-The current system provides very rich hints — exact target values, pre-validated. To make the model learn more spatial reasoning:
+The current system provides very rich hints — exact target values, pre-validated. To increase difficulty:
 
 - **Reduce hint detail**: report "overlap exists, area = 1840px²" without `suggested_y`. Force the model to compute moves itself.
 - **Remove conflict graph**: only report pairwise defects, no connected components or envelopes.
 - **Minimal mode**: defect type + severity only — no hints at all.
-
-This acts as a curriculum: start with full hints for supervised warm-up, then progressively reduce as the model improves.
 
 ### Multi-Slide Support
 
