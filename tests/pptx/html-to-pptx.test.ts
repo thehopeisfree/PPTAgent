@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import type { Browser, Page } from "playwright";
-import { chromium } from "playwright";
+import { launchBrowser } from "../../src/utils/browser.js";
 import { htmlToPptx, htmlToPptxBuffer } from "../../src/pptx/html-to-pptx.js";
 
 describe("htmlToPptx", () => {
@@ -8,7 +8,7 @@ describe("htmlToPptx", () => {
   let page: Page;
 
   beforeAll(async () => {
-    browser = await chromium.launch();
+    browser = await launchBrowser();
     page = await browser.newPage();
     await page.setViewportSize({ width: 1920, height: 1080 });
   });

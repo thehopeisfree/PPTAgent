@@ -2,7 +2,8 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import * as os from "node:os";
-import { chromium, type Browser, type Page } from "playwright";
+import type { Browser, Page } from "playwright";
+import { launchBrowser } from "../../src/utils/browser.js";
 import {
   createSession,
   initRollout,
@@ -21,7 +22,7 @@ describe("Loop Driver (integration)", () => {
   let tmpDir: string;
 
   beforeAll(async () => {
-    browser = await chromium.launch();
+    browser = await launchBrowser();
     page = await browser.newPage();
     await page.setViewportSize({ width: 1920, height: 1080 });
     tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "pptagent-test-"));

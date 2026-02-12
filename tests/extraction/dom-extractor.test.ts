@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { chromium, type Browser, type Page } from "playwright";
+import type { Browser, Page } from "playwright";
 import { extractDOM } from "../../src/extraction/dom-extractor.js";
+import { launchBrowser } from "../../src/utils/browser.js";
 import { renderHTML } from "../../src/renderer/html-renderer.js";
 import { parseIR } from "../../src/schema/ir.js";
 import sampleIR from "../fixtures/sample-ir.json";
@@ -10,7 +11,7 @@ describe("DOM Extractor (integration)", () => {
   let page: Page;
 
   beforeAll(async () => {
-    browser = await chromium.launch();
+    browser = await launchBrowser();
     page = await browser.newPage();
     await page.setViewportSize({ width: 1920, height: 1080 });
   });

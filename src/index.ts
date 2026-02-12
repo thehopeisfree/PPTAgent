@@ -102,6 +102,9 @@ export {
   rectArea,
 } from "./utils/geometry.js";
 
+// Browser launch helper
+export { launchBrowser } from "./utils/browser.js";
+
 // FS helpers
 export {
   readJSON,

@@ -7,8 +7,8 @@
  * Exit code 0 = all good, non-zero = setup broken.
  */
 
-import { chromium } from "playwright";
 import { parseIR } from "../src/schema/ir.js";
+import { launchBrowser } from "../src/utils/browser.js";
 import { parsePatch } from "../src/schema/patch.js";
 import { renderHTML } from "../src/renderer/html-renderer.js";
 import { extractDOM } from "../src/extraction/dom-extractor.js";
@@ -41,7 +41,7 @@ async function verify() {
   checks.push("HTML rendering");
 
   // 3. Playwright launch + DOM extraction
-  const browser = await chromium.launch();
+  const browser = await launchBrowser();
   const page = await browser.newPage();
   await page.setViewportSize({ width: 1920, height: 1080 });
 

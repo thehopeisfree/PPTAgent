@@ -21,8 +21,8 @@
 
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { chromium } from "playwright";
 import { parseIR } from "../src/schema/ir.js";
+import { launchBrowser } from "../src/utils/browser.js";
 import { extractDOM, screenshotSlide } from "../src/extraction/dom-extractor.js";
 import { diagnose } from "../src/diagnostics/engine.js";
 import { rolloutPaths, writeJSON, writeFile } from "../src/utils/fs-helpers.js";
@@ -73,7 +73,7 @@ async function main() {
   const ir = parseIR(irData);
 
   // Launch browser
-  const browser = await chromium.launch();
+  const browser = await launchBrowser();
   const page = await browser.newPage();
   await page.setViewportSize({ width: 1920, height: 1080 });
 

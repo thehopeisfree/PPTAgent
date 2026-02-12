@@ -60,11 +60,30 @@ else
 fi
 echo "  Done."
 
-# ── Step 3: Install Playwright Chromium ──
+# ── Step 3: Chromium setup ──
 echo ""
-echo "[3/6] Installing Playwright Chromium..."
-# --with-deps installs system libraries (libgbm, libnss3, etc.) needed in containers
-npx playwright install chromium --with-deps 2>/dev/null || npx playwright install chromium
+echo "[3/6] Setting up Chromium..."
+# Check for system Chromium first (CaaS containers typically have it)
+SYSTEM_CHROMIUM=""
+for candidate in /usr/bin/chromium /usr/bin/chromium-browser /usr/bin/google-chrome; do
+  if [ -x "$candidate" ]; then
+    SYSTEM_CHROMIUM="$candidate"
+    break
+  fi
+done
+
+if [ -n "$SYSTEM_CHROMIUM" ]; then
+  echo "  Found system Chromium: $SYSTEM_CHROMIUM"
+  echo "  Setting CHROMIUM_PATH for launchBrowser()"
+  export CHROMIUM_PATH="$SYSTEM_CHROMIUM"
+  # Persist for later processes
+  echo "export CHROMIUM_PATH=\"$SYSTEM_CHROMIUM\"" >> /etc/profile.d/pptagent.sh 2>/dev/null || \
+    echo "export CHROMIUM_PATH=\"$SYSTEM_CHROMIUM\"" >> "$HOME/.bashrc" 2>/dev/null || true
+else
+  echo "  No system Chromium found, installing via Playwright..."
+  # --with-deps installs system libraries (libgbm, libnss3, etc.) needed in containers
+  npx playwright install chromium --with-deps 2>/dev/null || npx playwright install chromium
+fi
 echo "  Done."
 
 # ── Step 4: Install fonts ──

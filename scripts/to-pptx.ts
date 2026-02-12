@@ -10,8 +10,8 @@
  */
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { chromium } from "playwright";
 import { htmlToPptxFile } from "../src/pptx/html-to-pptx.js";
+import { launchBrowser } from "../src/utils/browser.js";
 
 async function main() {
   const args = process.argv.slice(2);
@@ -33,7 +33,7 @@ async function main() {
     process.exit(2);
   }
 
-  const browser = await chromium.launch();
+  const browser = await launchBrowser();
   try {
     const page = await browser.newPage();
     await page.setViewportSize({ width: 1920, height: 1080 });
