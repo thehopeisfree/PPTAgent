@@ -24,8 +24,14 @@ describe("totalSeverity", () => {
         severity: 40,
         details: { current: 16, min: 20 },
       },
+      {
+        type: "edge_proximity",
+        eid: "e3",
+        severity: 14,
+        details: { edge: "left", distance_px: 10, threshold_px: 24 },
+      },
     ];
-    expect(totalSeverity(defects)).toBe(42 + 3680 + 40);
+    expect(totalSeverity(defects)).toBe(42 + 3680 + 40 + 14);
   });
 
   it("returns 0 for empty defects", () => {
