@@ -28,6 +28,28 @@
 
 ---
 
+## Rollout Directory
+
+All intermediate artifacts must be saved to the **rollout directory** specified in your instructions. Use `rolloutPaths()` to compute file paths for each iteration:
+
+```typescript
+import { rolloutPaths, writeJSON, writeFile } from '/tools/pptagent/dist/index.js';
+
+// rolloutDir is provided in your system prompt / task instructions
+const paths = rolloutPaths(rolloutDir, 0);  // iter 0
+// paths.ir     → <rolloutDir>/ir_0.json
+// paths.html   → <rolloutDir>/out_0.html
+// paths.render → <rolloutDir>/render_0.png
+// paths.dom    → <rolloutDir>/dom_0.json
+// paths.diag   → <rolloutDir>/diag_0.json
+// paths.patch  → <rolloutDir>/patch_0.json
+// paths.trace  → <rolloutDir>/trace.jsonl
+```
+
+Save every artifact at each iteration so the pipeline can track convergence.
+
+---
+
 ## Slide HTML Format
 
 Your HTML must follow this exact structure. The diagnostics pipeline depends on `#slide` and `data-eid`.
