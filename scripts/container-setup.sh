@@ -139,7 +139,9 @@ else
   echo ""
   echo "Running smoke test..."
   node --input-type=module -e "
-    import { parseIR, renderHTML, applyPatch, parsePatch } from '$PPTAGENT_ROOT/dist/index.js';
+    import { parseIR, renderHTML, applyPatch, parsePatch, extractDOM, diagnose, launchBrowser } from '$PPTAGENT_ROOT/dist/index.js';
+
+    // 1. Schema + renderer + patch
     const ir = parseIR({
       slide: { w: 1280, h: 720 },
       elements: [{
@@ -154,6 +156,17 @@ else
     const { ir: patched } = applyPatch(ir, patch);
     if (patched.elements[0].layout.x !== 50) throw new Error('applyPatch failed');
     console.log('  Schema, renderer, patch: OK');
+
+    // 2. Playwright + DOM extraction + diagnostics
+    const browser = await launchBrowser();
+    const page = await browser.newPage();
+    await page.setViewportSize({ width: 1920, height: 1080 });
+    const dom = await extractDOM(page, html);
+    if (dom.elements.length !== 1) throw new Error('extractDOM: expected 1 element, got ' + dom.elements.length);
+    const diag = diagnose(dom, ir);
+    if (typeof diag.summary.defect_count !== 'number') throw new Error('diagnose failed');
+    await browser.close();
+    console.log('  Playwright, DOM extraction, diagnostics: OK');
   "
   echo "  Smoke test passed."
 fi
