@@ -114,6 +114,7 @@ async function main() {
   if (outdir) {
     const paths = rolloutPaths(outdir, iter);
     await writeFile(paths.html, html);
+    await writeJSON(paths.ir, ir);
     await writeJSON(paths.dom, dom);
     await writeJSON(paths.diag, diag);
     await writeFile(paths.render, png);
