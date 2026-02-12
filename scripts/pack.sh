@@ -7,7 +7,9 @@
 #   dist/                 compiled JS + declarations
 #   package.json          dependency manifest
 #   package-lock.json     lockfile for reproducible installs
-#   SKILL.md              model context document
+#   SKILL.md              model context document (router)
+#   creating.md           phase 1: HTML generation guide
+#   fixing.md             phase 2: defect fixing guide
 #   scripts/container-setup.sh
 #
 # Default output: pptagent.tar.gz in the repo root.
@@ -37,6 +39,8 @@ tar czf "$OUTPUT" \
   package.json \
   package-lock.json \
   SKILL.md \
+  creating.md \
+  fixing.md \
   scripts/container-setup.sh
 
 SIZE=$(du -h "$OUTPUT" | cut -f1)
