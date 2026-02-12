@@ -175,8 +175,19 @@ export function analyzeConflicts(
       });
     }
 
+    // Compute anchor: highest priority, tie-break highest zIndex, then alphabetically first
+    const anchorEid = component
+      .map((eid) => ({
+        eid,
+        priority: irMap.get(eid)?.priority ?? 0,
+        z: domMap.get(eid)?.zIndex ?? 0,
+      }))
+      .sort((a, b) => b.priority - a.priority || b.z - a.z || a.eid.localeCompare(b.eid))
+      [0]!.eid;
+
     results.push({
       eids: component,
+      anchor_eid: anchorEid,
       edges,
       envelopes,
     });

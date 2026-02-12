@@ -46,6 +46,7 @@ describe("applyPatch", () => {
     expect(overrides[0]!.field).toBe("layout.y");
     expect(overrides[0]!.requested).toBe(200);
     expect(overrides[0]!.clamped_to).toBe(80);
+    expect(overrides[0]!.clamp_reason).toBe("budget");
   });
 
   it("enforces size budget for high-priority elements", () => {
@@ -60,6 +61,7 @@ describe("applyPatch", () => {
     // 80 * 1.15 = 92
     expect(title.layout.h).toBe(92);
     expect(overrides.length).toBeGreaterThan(0);
+    expect(overrides[0]!.clamp_reason).toBe("budget");
   });
 
   it("allows unrestricted changes to low-priority elements", () => {
@@ -128,6 +130,7 @@ describe("applyPatch", () => {
     // 44 * 0.85 = 37.4
     expect(title.style.fontSize).toBeCloseTo(37.4, 1);
     expect(overrides.length).toBeGreaterThan(0);
+    expect(overrides[0]!.clamp_reason).toBe("budget");
   });
 
   // ── Image aspect ratio enforcement ──
@@ -226,6 +229,7 @@ describe("applyPatch", () => {
     expect(ratioOverride!.field).toBe("layout.h");
     expect(ratioOverride!.requested).toBe(200);
     expect(ratioOverride!.clamped_to).toBe(150);
+    expect(ratioOverride!.clamp_reason).toBe("ratio");
   });
 
   it("does not enforce aspect ratio on non-image elements", () => {
@@ -262,5 +266,71 @@ describe("applyPatch", () => {
     const bullets = result.elements.find((e) => e.eid === "e_bullets_002")!;
     // Budget clamped to 18.7, then min font enforces 20
     expect(bullets.style.fontSize).toBe(20);
+  });
+
+  it("logs min_font override when fontSize is below floor", () => {
+    const ir = parseIR(sampleIR);
+    // e_bullets_002 priority 80, fontSize 22. Set to 10 → budget clamps to 18.7, then min font to 20
+    const patch = parsePatch({
+      edits: [{ eid: "e_bullets_002", style: { fontSize: 10 } }],
+    });
+    const { overrides } = applyPatch(ir, patch);
+    const minFontOverride = overrides.find((o) => o.clamp_reason === "min_font");
+    expect(minFontOverride).toBeDefined();
+    expect(minFontOverride!.eid).toBe("e_bullets_002");
+    expect(minFontOverride!.field).toBe("style.fontSize");
+    expect(minFontOverride!.clamped_to).toBe(20);
+  });
+
+  it("logs bounds override when element exceeds slide edges", () => {
+    const ir = parseIR({
+      slide: { w: 1280, h: 720 },
+      elements: [
+        {
+          eid: "e1",
+          type: "text",
+          priority: 40,
+          content: "Test",
+          layout: { x: 100, y: 100, w: 200, h: 100, zIndex: 10 },
+          style: { fontSize: 16 },
+        },
+      ],
+    });
+    const patch = parsePatch({
+      edits: [{ eid: "e1", layout: { x: 1200, w: 200 } }],
+    });
+    const { overrides } = applyPatch(ir, patch);
+    const boundsOverride = overrides.find((o) => o.clamp_reason === "bounds");
+    expect(boundsOverride).toBeDefined();
+    expect(boundsOverride!.field).toBe("layout.w");
+    expect(boundsOverride!.clamped_to).toBe(80);
+  });
+
+  it("logs bounds override for negative coordinates", () => {
+    const ir = parseIR({
+      slide: { w: 1280, h: 720 },
+      elements: [
+        {
+          eid: "e1",
+          type: "text",
+          priority: 40,
+          content: "Test",
+          layout: { x: 100, y: 100, w: 200, h: 100, zIndex: 10 },
+          style: { fontSize: 16 },
+        },
+      ],
+    });
+    const patch = parsePatch({
+      edits: [{ eid: "e1", layout: { x: -50, y: -30 } }],
+    });
+    const { overrides } = applyPatch(ir, patch);
+    const xOverride = overrides.find((o) => o.field === "layout.x" && o.clamp_reason === "bounds");
+    const yOverride = overrides.find((o) => o.field === "layout.y" && o.clamp_reason === "bounds");
+    expect(xOverride).toBeDefined();
+    expect(xOverride!.requested).toBe(-50);
+    expect(xOverride!.clamped_to).toBe(0);
+    expect(yOverride).toBeDefined();
+    expect(yOverride!.requested).toBe(-30);
+    expect(yOverride!.clamped_to).toBe(0);
   });
 });

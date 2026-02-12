@@ -7,7 +7,7 @@ import { detectOutOfBounds } from "./detectors/out-of-bounds.js";
 import { detectOverlaps } from "./detectors/overlap.js";
 import { detectFontTooSmall } from "./detectors/font-too-small.js";
 import { analyzeConflicts } from "./hints/conflict-solver.js";
-import { validateHint } from "./hints/hint-calculator.js";
+import { validateHint, annotateBudgetConstraints } from "./hints/hint-calculator.js";
 import { totalSeverity } from "./severity.js";
 
 /**
@@ -61,6 +61,9 @@ export function diagnose(dom: DOMDocument, ir: IRDocument): DiagDocument {
       d.hint = validateHint(d.hint);
     }
   }
+
+  // Annotate hints with budget constraints for high-priority elements
+  annotateBudgetConstraints(defects, ir.elements, dom.elements);
 
   // Analyze conflict graph
   const conflictGraph = analyzeConflicts(defects, dom.elements, ir.elements);

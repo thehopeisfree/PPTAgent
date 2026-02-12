@@ -54,6 +54,7 @@ export type { PatchEdit, PatchDocument } from "./schema/patch.js";
 export { parsePatch, PatchDocumentSchema } from "./schema/patch.js";
 
 export type {
+  ClampReason,
   QualityLabel,
   Override,
   AppliedHint,
@@ -75,7 +76,7 @@ export { detectOutOfBounds } from "./diagnostics/detectors/out-of-bounds.js";
 export { detectOverlaps } from "./diagnostics/detectors/overlap.js";
 export { detectFontTooSmall } from "./diagnostics/detectors/font-too-small.js";
 export { totalSeverity } from "./diagnostics/severity.js";
-export { validateHint } from "./diagnostics/hints/hint-calculator.js";
+export { validateHint, annotateBudgetConstraints } from "./diagnostics/hints/hint-calculator.js";
 export { analyzeConflicts } from "./diagnostics/hints/conflict-solver.js";
 export { computeSeparationOptions } from "./diagnostics/hints/separation-calculator.js";
 

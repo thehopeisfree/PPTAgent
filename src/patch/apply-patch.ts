@@ -47,6 +47,7 @@ function clampSize(
       requested,
       clamped_to: clamped,
       reason: `HIGH_PRIO_SIZE_BUDGET exceeded (max ${HIGH_PRIO_SIZE_BUDGET * 100}% change from current ${current})`,
+      clamp_reason: "budget",
     });
     return clamped;
   }
@@ -58,6 +59,7 @@ function clampSize(
       requested,
       clamped_to: clamped,
       reason: `HIGH_PRIO_SIZE_BUDGET exceeded (max ${HIGH_PRIO_SIZE_BUDGET * 100}% change from current ${current})`,
+      clamp_reason: "budget",
     });
     return clamped;
   }
@@ -80,6 +82,7 @@ function clampPosition(
       requested,
       clamped_to: clamped,
       reason: `HIGH_PRIO_MOVE_PX exceeded (max ${HIGH_PRIO_MOVE_PX}px from current ${current})`,
+      clamp_reason: "budget",
     });
     return clamped;
   }
@@ -143,17 +146,17 @@ export function applyPatch(
 
         if (patchedW && !patchedH) {
           const newH = Math.round(el.layout.w / origRatio);
-          overrides.push({ eid: el.eid, field: "layout.h", requested: el.layout.h, clamped_to: newH, reason: "aspect ratio preserved (w changed)" });
+          overrides.push({ eid: el.eid, field: "layout.h", requested: el.layout.h, clamped_to: newH, reason: "aspect ratio preserved (w changed)", clamp_reason: "ratio" });
           el.layout.h = newH;
         } else if (patchedH && !patchedW) {
           const newW = Math.round(el.layout.h * origRatio);
-          overrides.push({ eid: el.eid, field: "layout.w", requested: el.layout.w, clamped_to: newW, reason: "aspect ratio preserved (h changed)" });
+          overrides.push({ eid: el.eid, field: "layout.w", requested: el.layout.w, clamped_to: newW, reason: "aspect ratio preserved (h changed)", clamp_reason: "ratio" });
           el.layout.w = newW;
         } else if (patchedW && patchedH) {
           const newRatio = el.layout.w / el.layout.h;
           if (Math.abs(newRatio - origRatio) / origRatio > IMAGE_ASPECT_RATIO_EPS) {
             const newH = Math.round(el.layout.w / origRatio);
-            overrides.push({ eid: el.eid, field: "layout.h", requested: el.layout.h, clamped_to: newH, reason: "aspect ratio preserved (both changed, ratio deviation exceeded)" });
+            overrides.push({ eid: el.eid, field: "layout.h", requested: el.layout.h, clamped_to: newH, reason: "aspect ratio preserved (both changed, ratio deviation exceeded)", clamp_reason: "ratio" });
             el.layout.h = newH;
           }
         }
@@ -199,18 +202,36 @@ export function applyPatch(
     if (el.style.fontSize != null) {
       const minFont = getMinFont(el.priority);
       if (minFont != null && el.style.fontSize < minFont) {
+        overrides.push({
+          eid: el.eid,
+          field: "style.fontSize",
+          requested: el.style.fontSize,
+          clamped_to: minFont,
+          reason: `min font floor for priority ${el.priority}`,
+          clamp_reason: "min_font",
+        });
         el.style.fontSize = minFont;
       }
     }
 
     // Clamp layout to slide bounds
-    el.layout.x = Math.max(0, el.layout.x);
-    el.layout.y = Math.max(0, el.layout.y);
+    if (el.layout.x < 0) {
+      overrides.push({ eid: el.eid, field: "layout.x", requested: el.layout.x, clamped_to: 0, reason: "slide bounds (x < 0)", clamp_reason: "bounds" });
+      el.layout.x = 0;
+    }
+    if (el.layout.y < 0) {
+      overrides.push({ eid: el.eid, field: "layout.y", requested: el.layout.y, clamped_to: 0, reason: "slide bounds (y < 0)", clamp_reason: "bounds" });
+      el.layout.y = 0;
+    }
     if (el.layout.x + el.layout.w > SLIDE_W) {
-      el.layout.w = SLIDE_W - el.layout.x;
+      const clampedW = SLIDE_W - el.layout.x;
+      overrides.push({ eid: el.eid, field: "layout.w", requested: el.layout.w, clamped_to: clampedW, reason: "slide bounds (x + w > SLIDE_W)", clamp_reason: "bounds" });
+      el.layout.w = clampedW;
     }
     if (el.layout.y + el.layout.h > SLIDE_H) {
-      el.layout.h = SLIDE_H - el.layout.y;
+      const clampedH = SLIDE_H - el.layout.y;
+      overrides.push({ eid: el.eid, field: "layout.h", requested: el.layout.h, clamped_to: clampedH, reason: "slide bounds (y + h > SLIDE_H)", clamp_reason: "bounds" });
+      el.layout.h = clampedH;
     }
   }
 

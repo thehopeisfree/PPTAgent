@@ -68,6 +68,7 @@ describe("Conflict Solver (analyzeConflicts)", () => {
     expect(result).toHaveLength(1);
     const comp = result[0]!;
     expect(comp.eids).toHaveLength(2);
+    expect(comp.anchor_eid).toBe("e1"); // e1 has priority 100, e2 has 80
     expect(comp.edges).toHaveLength(1);
     expect(comp.edges[0]!.separations).toHaveLength(4);
     expect(comp.envelopes).toHaveLength(2);
@@ -179,6 +180,11 @@ describe("Conflict Solver (analyzeConflicts)", () => {
     // Components are independent
     const allEids = [...result[0]!.eids, ...result[1]!.eids];
     expect(new Set(allEids).size).toBe(4);
+    // Anchor is highest priority in each component
+    const comp1 = result.find((c) => c.eids.includes("A"))!;
+    const comp2 = result.find((c) => c.eids.includes("C"))!;
+    expect(comp1.anchor_eid).toBe("A"); // priority 100
+    expect(comp2.anchor_eid).toBe("C"); // priority 90
   });
 
   it("space envelope boundary: element near slide edge reflects boundary", () => {
@@ -274,5 +280,84 @@ describe("Conflict Solver (analyzeConflicts)", () => {
     // Decoration should not block free space — e1 should have free_top based on slide edge
     const e1Env = result[0]!.envelopes.find((e) => e.eid === "e1")!;
     expect(e1Env.free_top).toBe(92); // distance to slide top edge
+  });
+
+  it("anchor_eid tie-breaks by zIndex then alphabetical", () => {
+    const defects: Defect[] = [
+      {
+        type: "overlap",
+        owner_eid: "B",
+        other_eid: "A",
+        severity: 500,
+        details: { overlap_area_px: 300 },
+      },
+    ];
+    // Both same priority, A has lower zIndex
+    const domEls: DOMElement[] = [
+      {
+        eid: "A",
+        bbox: { x: 100, y: 100, w: 200, h: 80 },
+        safeBox: { x: 92, y: 92, w: 216, h: 96 },
+        contentBox: null,
+        zIndex: 10,
+        computed: { fontSize: 20, lineHeight: 1.4 },
+      },
+      {
+        eid: "B",
+        bbox: { x: 100, y: 150, w: 200, h: 80 },
+        safeBox: { x: 92, y: 142, w: 216, h: 96 },
+        contentBox: null,
+        zIndex: 20,
+        computed: { fontSize: 20, lineHeight: 1.4 },
+      },
+    ];
+    const irEls: IRElement[] = [
+      { eid: "A", type: "text", priority: 80, content: "A", layout: { x: 100, y: 100, w: 200, h: 80, zIndex: 10 }, style: { fontSize: 20 } },
+      { eid: "B", type: "text", priority: 80, content: "B", layout: { x: 100, y: 150, w: 200, h: 80, zIndex: 20 }, style: { fontSize: 20 } },
+    ];
+
+    const result = analyzeConflicts(defects, domEls, irEls);
+    expect(result).toHaveLength(1);
+    // Same priority → tie-break by zIndex (B has 20 > A has 10)
+    expect(result[0]!.anchor_eid).toBe("B");
+  });
+
+  it("anchor_eid tie-breaks alphabetically when priority and zIndex match", () => {
+    const defects: Defect[] = [
+      {
+        type: "overlap",
+        owner_eid: "Z_elem",
+        other_eid: "A_elem",
+        severity: 500,
+        details: { overlap_area_px: 300 },
+      },
+    ];
+    const domEls: DOMElement[] = [
+      {
+        eid: "A_elem",
+        bbox: { x: 100, y: 100, w: 200, h: 80 },
+        safeBox: { x: 92, y: 92, w: 216, h: 96 },
+        contentBox: null,
+        zIndex: 10,
+        computed: { fontSize: 20, lineHeight: 1.4 },
+      },
+      {
+        eid: "Z_elem",
+        bbox: { x: 100, y: 150, w: 200, h: 80 },
+        safeBox: { x: 92, y: 142, w: 216, h: 96 },
+        contentBox: null,
+        zIndex: 10,
+        computed: { fontSize: 20, lineHeight: 1.4 },
+      },
+    ];
+    const irEls: IRElement[] = [
+      { eid: "A_elem", type: "text", priority: 80, content: "A", layout: { x: 100, y: 100, w: 200, h: 80, zIndex: 10 }, style: { fontSize: 20 } },
+      { eid: "Z_elem", type: "text", priority: 80, content: "Z", layout: { x: 100, y: 150, w: 200, h: 80, zIndex: 10 }, style: { fontSize: 20 } },
+    ];
+
+    const result = analyzeConflicts(defects, domEls, irEls);
+    expect(result).toHaveLength(1);
+    // Same priority, same zIndex → alphabetically first
+    expect(result[0]!.anchor_eid).toBe("A_elem");
   });
 });

@@ -9,6 +9,9 @@ export interface Hint {
   suggested_y?: number;
   suggested_fontSize?: number;
   target_eid?: string;
+  limited_by_budget?: boolean;
+  budget_max_delta?: number;
+  steps_needed?: number;
 }
 
 /** Content overflow defect details */
@@ -111,6 +114,7 @@ export interface SpaceEnvelope {
 /** A connected subgraph of overlapping elements */
 export interface ConflictComponent {
   eids: string[];
+  anchor_eid: string;
   edges: ConflictEdge[];
   envelopes: SpaceEnvelope[];
 }

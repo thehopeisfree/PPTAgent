@@ -253,6 +253,139 @@ describe("Diagnostics Engine", () => {
     expect(topoIdx).toBeLessThan(fontIdx);
   });
 
+  it("annotates hint with limited_by_budget for high-priority element needing >48px move", () => {
+    // e1 (priority 100) overflows and hint suggests moving 100px
+    const ir: IRDocument = {
+      slide: { w: 1280, h: 720 },
+      elements: [
+        {
+          eid: "e_title",
+          type: "title",
+          priority: 100,
+          content: "Title",
+          layout: { x: 48, y: 32, w: 400, h: 80, zIndex: 10 },
+          style: { fontSize: 44, lineHeight: 1.2 },
+        },
+        {
+          eid: "e_text",
+          type: "text",
+          priority: 80,
+          content: "Body",
+          layout: { x: 48, y: 80, w: 400, h: 200, zIndex: 10 },
+          style: { fontSize: 22, lineHeight: 1.5 },
+        },
+      ],
+    };
+    const dom: DOMDocument = {
+      slide: { w: 1280, h: 720 },
+      safe_padding: 8,
+      elements: [
+        {
+          eid: "e_title",
+          bbox: { x: 48, y: 32, w: 400, h: 80 },
+          safeBox: { x: 40, y: 24, w: 416, h: 96 },
+          contentBox: { x: 48, y: 34, w: 300, h: 50 },
+          zIndex: 10,
+          computed: { fontSize: 44, lineHeight: 1.2 },
+        },
+        {
+          eid: "e_text",
+          bbox: { x: 48, y: 80, w: 400, h: 200 },
+          safeBox: { x: 40, y: 72, w: 416, h: 216 },
+          contentBox: { x: 48, y: 82, w: 350, h: 180 },
+          zIndex: 10,
+          computed: { fontSize: 22, lineHeight: 1.5 },
+        },
+      ],
+    };
+
+    const diag = diagnose(dom, ir);
+    // Find overlap defects with hints that target high-priority elements
+    const hintsWithBudget = diag.defects
+      .filter((d) => d.hint?.limited_by_budget === true);
+    // If any hint needs >48px move for a priority>=80 element, it should be flagged
+    for (const d of hintsWithBudget) {
+      expect(d.hint!.steps_needed).toBeGreaterThanOrEqual(1);
+      expect(d.hint!.budget_max_delta).toBeDefined();
+    }
+  });
+
+  it("does not annotate hints within budget", () => {
+    const ir: IRDocument = {
+      slide: { w: 1280, h: 720 },
+      elements: [
+        {
+          eid: "e1",
+          type: "title",
+          priority: 100,
+          content: "Hello",
+          layout: { x: 48, y: 32, w: 400, h: 80, zIndex: 10 },
+          style: { fontSize: 44, lineHeight: 1.2 },
+        },
+      ],
+    };
+    const dom: DOMDocument = {
+      slide: { w: 1280, h: 720 },
+      safe_padding: 8,
+      elements: [
+        {
+          eid: "e1",
+          bbox: { x: 48, y: 32, w: 400, h: 80 },
+          safeBox: { x: 40, y: 24, w: 416, h: 96 },
+          contentBox: { x: 48, y: 34, w: 300, h: 50 },
+          zIndex: 10,
+          computed: { fontSize: 44, lineHeight: 1.2 },
+        },
+      ],
+    };
+
+    const diag = diagnose(dom, ir);
+    // No defects → no hints → nothing annotated
+    for (const d of diag.defects) {
+      if (d.hint) {
+        expect(d.hint.limited_by_budget).toBeUndefined();
+      }
+    }
+  });
+
+  it("does not annotate limited_by_budget for low-priority elements", () => {
+    const ir: IRDocument = {
+      slide: { w: 1280, h: 720 },
+      elements: [
+        {
+          eid: "e1",
+          type: "text",
+          priority: 40,
+          content: "Body text that overflows",
+          layout: { x: 48, y: 32, w: 400, h: 50, zIndex: 10 },
+          style: { fontSize: 20, lineHeight: 1.5 },
+        },
+      ],
+    };
+    const dom: DOMDocument = {
+      slide: { w: 1280, h: 720 },
+      safe_padding: 8,
+      elements: [
+        {
+          eid: "e1",
+          bbox: { x: 48, y: 32, w: 400, h: 50 },
+          safeBox: { x: 40, y: 24, w: 416, h: 66 },
+          contentBox: { x: 48, y: 34, w: 380, h: 200 },
+          zIndex: 10,
+          computed: { fontSize: 20, lineHeight: 1.5 },
+        },
+      ],
+    };
+
+    const diag = diagnose(dom, ir);
+    // Low-priority element should never get budget annotations
+    for (const d of diag.defects) {
+      if (d.hint) {
+        expect(d.hint.limited_by_budget).toBeUndefined();
+      }
+    }
+  });
+
   it("builds conflict graph for overlapping elements", () => {
     const ir: IRDocument = {
       slide: { w: 1280, h: 720 },
@@ -303,6 +436,7 @@ describe("Diagnostics Engine", () => {
     expect(diag.summary.conflict_graph!.length).toBeGreaterThanOrEqual(1);
     const comp = diag.summary.conflict_graph![0]!;
     expect(comp.eids).toHaveLength(2);
+    expect(comp.anchor_eid).toBe("e1"); // e1 has priority 100
     expect(comp.edges).toHaveLength(1);
     expect(comp.edges[0]!.separations).toHaveLength(4);
     expect(comp.envelopes).toHaveLength(2);

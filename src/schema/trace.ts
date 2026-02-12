@@ -3,6 +3,9 @@ import type { DefectType, WarningType } from "./diag.js";
 /** Quality label for a rollout */
 export type QualityLabel = "success_clean" | "success_with_warnings" | "degraded";
 
+/** Why a value was clamped */
+export type ClampReason = "budget" | "bounds" | "ratio" | "min_font";
+
 /** Override record logged when budget clamping occurs */
 export interface Override {
   eid: string;
@@ -10,6 +13,7 @@ export interface Override {
   requested: number;
   clamped_to: number;
   reason: string;
+  clamp_reason: ClampReason;
 }
 
 /** Applied hint record */
