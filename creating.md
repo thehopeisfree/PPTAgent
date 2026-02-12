@@ -138,7 +138,7 @@ Every element is a `<div>` inside `#slide` with a unique `data-eid`. If an IR is
 After writing your HTML, convert flexbox to absolute positioning:
 
 ```bash
-cd /tools/pptagent && npx tsx scripts/flatten.ts input.html abs.html
+cd /tools/pptagent && node bin/flatten.js input.html abs.html
 ```
 
 This produces `abs.html` where every `data-eid` element has `position: absolute` with computed `left`, `top`, `width`, `height` values. The flattened HTML is what you'll edit in the fixing phase.
@@ -168,4 +168,4 @@ Key properties on every element after flattening:
 - `z-index` for stacking (default: 10, decorations use 0)
 - `overflow: visible` (required for diagnostics to detect overflow)
 
-Now proceed to validation — read `/tools/pptagent/fixing.md`.
+Now proceed to validation — see fixing.md or run `cd /tools/pptagent && node bin/check-slide.js abs.html --outdir <rolloutDir> --iter 0`.

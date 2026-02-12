@@ -16,7 +16,7 @@ async function main() {
   const args = process.argv.slice(2);
   if (args.length < 2) {
     console.error(
-      "Usage: npx tsx scripts/to-pptx.ts <slide.html> <output.pptx>"
+      `Usage: ${process.argv[1]} <slide.html> <output.pptx>`
     );
     process.exit(2);
   }

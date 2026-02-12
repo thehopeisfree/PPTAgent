@@ -31,7 +31,7 @@ const args = process.argv.slice(2);
 const rolloutDir = args[0];
 
 if (!rolloutDir) {
-  console.error("Usage: npx tsx scripts/replay.ts <rollout-dir> [output.html]");
+  console.error(`Usage: ${process.argv[1]} <rollout-dir> [output.html]`);
   console.error("");
   console.error("Generates a visual debug HTML replay from rollout artifacts.");
   process.exit(2);

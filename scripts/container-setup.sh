@@ -28,8 +28,8 @@ SKIP_VERIFY="${SKIP_VERIFY:-0}"
 
 cd "$PPTAGENT_ROOT"
 
-# Detect mode: tarball (dist/ exists, no src/) vs full repo (src/ exists)
-if [ -d "dist" ] && [ ! -d "src" ]; then
+# Detect mode: tarball (bin/ exists, no src/) vs full repo (src/ exists)
+if [ -d "bin" ] && [ ! -d "src" ]; then
   MODE="tarball"
 else
   MODE="repo"
@@ -112,10 +112,19 @@ fi
 # ── Step 5: Build TypeScript (repo mode only) ──
 echo ""
 if [ "$MODE" = "repo" ]; then
-  echo "[5/6] Building TypeScript..."
+  echo "[5/6] Building TypeScript + bundling CLI..."
   npm run build
+  mkdir -p bin
+  npx esbuild \
+    scripts/check-slide.ts \
+    scripts/flatten.ts \
+    scripts/to-pptx.ts \
+    scripts/verify-setup.ts \
+    scripts/replay.ts \
+    --bundle --platform=node --format=esm --outdir=bin \
+    --external:playwright --external:pptxgenjs
 else
-  echo "[5/6] Skipping build (pre-built tarball)."
+  echo "[5/6] Skipping build (pre-bundled tarball)."
 fi
 echo "  Done."
 
@@ -138,40 +147,11 @@ if [ "$SKIP_VERIFY" = "1" ]; then
 else
   echo ""
   echo "Running smoke test..."
-  node --input-type=module -e "
-    import { parseIR, renderHTML, applyPatch, parsePatch, extractDOM, diagnose, launchBrowser } from '$PPTAGENT_ROOT/dist/index.js';
-
-    // 1. Schema + renderer + patch
-    const ir = parseIR({
-      slide: { w: 1280, h: 720 },
-      elements: [{
-        eid: 'e1', type: 'title', priority: 100,
-        content: 'Test', layout: { x: 40, y: 40, w: 400, h: 60 },
-        style: { fontSize: 36 },
-      }],
-    });
-    const html = renderHTML(ir);
-    if (!html.includes('data-eid')) throw new Error('renderHTML failed');
-    const patch = parsePatch({ edits: [{ eid: 'e1', layout: { x: 50 } }] });
-    const { ir: patched } = applyPatch(ir, patch);
-    if (patched.elements[0].layout.x !== 50) throw new Error('applyPatch failed');
-    console.log('  Schema, renderer, patch: OK');
-
-    // 2. Playwright + DOM extraction + diagnostics
-    const browser = await launchBrowser();
-    const page = await browser.newPage();
-    await page.setViewportSize({ width: 1920, height: 1080 });
-    const dom = await extractDOM(page, html);
-    if (dom.elements.length !== 1) throw new Error('extractDOM: expected 1 element, got ' + dom.elements.length);
-    const diag = diagnose(dom, ir);
-    if (typeof diag.summary.defect_count !== 'number') throw new Error('diagnose failed');
-    await browser.close();
-    console.log('  Playwright, DOM extraction, diagnostics: OK');
-  "
+  node "$PPTAGENT_ROOT/bin/verify-setup.js"
   echo "  Smoke test passed."
 fi
 
 echo ""
 echo "=== PPTAgent ready ==="
 echo ""
-echo "Import from: $PPTAGENT_ROOT/dist/index.js"
+echo "CLI: node $PPTAGENT_ROOT/bin/{check-slide,flatten,to-pptx}.js"

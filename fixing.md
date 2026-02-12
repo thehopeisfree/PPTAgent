@@ -5,7 +5,7 @@
 After flattening, validate your layout:
 
 ```bash
-cd /tools/pptagent && npx tsx scripts/check-slide.ts abs.html --outdir <rolloutDir> --iter 0
+cd /tools/pptagent && node bin/check-slide.js abs.html --outdir <rolloutDir> --iter 0
 ```
 
 No `input.json` needed — element types and priorities are auto-inferred from the rendered HTML.
@@ -174,7 +174,7 @@ When multiple elements overlap in a chain, the `conflict_graph` in the summary s
 After applying fixes, re-run diagnostics (increment `--iter`):
 
 ```bash
-cd /tools/pptagent && npx tsx scripts/check-slide.ts abs.html --outdir <rolloutDir> --iter 1
+cd /tools/pptagent && node bin/check-slide.js abs.html --outdir <rolloutDir> --iter 1
 ```
 
 Repeat until exit code 0. Layout changes can cascade — always re-validate after edits.

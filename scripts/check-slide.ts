@@ -57,8 +57,9 @@ const irPath = positional[1];
 const screenshotPath = positional[2]; // legacy: 3rd positional arg
 
 if (!htmlPath) {
-  console.error("Usage: npx tsx scripts/check-slide.ts <slide.html> [input.json] [screenshot.png]");
-  console.error("       npx tsx scripts/check-slide.ts <slide.html> [input.json] --outdir <dir> --iter <n>");
+  const prog = process.argv[1];
+  console.error(`Usage: ${prog} <slide.html> [input.json] [screenshot.png]`);
+  console.error(`       ${prog} <slide.html> [input.json] --outdir <dir> --iter <n>`);
   console.error("");
   console.error("Validates the HTML slide and prints diagnostics JSON.");
   console.error("If input.json is omitted, element types and priorities are inferred from HTML.");

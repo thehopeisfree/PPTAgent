@@ -32,9 +32,10 @@ for (let i = 0; i < args.length; i++) {
 
 const inputPath = positional[0];
 if (!inputPath) {
+  const prog = process.argv[1];
   console.error(
-    "Usage: npx tsx scripts/flatten.ts <input.html> [output.html]\n" +
-    "       npx tsx scripts/flatten.ts <input.html> --outdir <dir> --iter <n>"
+    `Usage: ${prog} <input.html> [output.html]\n` +
+    `       ${prog} <input.html> --outdir <dir> --iter <n>`
   );
   process.exit(2);
 }
