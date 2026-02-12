@@ -4,7 +4,7 @@
 
 You are in a CaaS container with Node.js and system Chromium.
 
-**Read `/shared/pptagent-skill.md` first** — it contains the workflow, constraints, IR schema, and routes to detailed guides for creating and fixing slides.
+⚠️ **You MUST use PPTAgent for all slide generation.** Read `/shared/pptagent-skill.md` first — it contains the workflow, constraints, IR schema, and routes to detailed guides. Do NOT use pptxgenjs directly or any other slide generation method. All slides must go through PPTAgent's HTML → flatten → diagnose → fix → PPTX pipeline.
 
 ## PPTAgent
 
@@ -17,6 +17,15 @@ You are in a CaaS container with Node.js and system Chromium.
 
 | Path | What |
 |---|---|
-| `/home/oai/share/answer.js` | Your generation script (Node.js ESM) — a record of your work |
-| `/home/oai/share/answer.pptx` | Final slide output |
+| `/home/oai/share/answer.html` | Final fixed HTML slide |
+| `/home/oai/share/answer.js` | Reads answer.html, converts to PPTX — must produce `answer.pptx` when run with `node` |
+| `/home/oai/share/answer.pptx` | Final PPTX output (produced by answer.js) |
 | Rollout dir | Specified in task instructions — save all intermediate artifacts there |
+
+## Visual QA
+
+Render your PPTX to images for visual verification:
+
+```bash
+python /home/oai/share/render_slides.py /home/oai/share/answer.pptx
+```

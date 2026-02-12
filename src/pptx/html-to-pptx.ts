@@ -1,5 +1,6 @@
 import type { Page } from "playwright";
 import { SLIDE_W, SLIDE_H } from "../constants.js";
+import { launchBrowser } from "../utils/browser.js";
 
 /**
  * Conversion factor: slide pixels → PowerPoint inches.
@@ -342,26 +343,61 @@ export async function htmlToPptx(
 
 /**
  * Convert HTML to PPTX and save to a file.
+ * When called without a Page, launches and closes a browser automatically.
  */
+export async function htmlToPptxFile(html: string, outputPath: string): Promise<void>;
+export async function htmlToPptxFile(page: Page, html: string, outputPath: string): Promise<void>;
 export async function htmlToPptxFile(
-  page: Page,
-  html: string,
-  outputPath: string
+  pageOrHtml: Page | string,
+  htmlOrPath: string,
+  maybePath?: string
 ): Promise<void> {
-  const pres = (await htmlToPptx(page, html)) as { writeFile: (opts: { fileName: string }) => Promise<void> };
-  await pres.writeFile({ fileName: outputPath });
+  if (typeof pageOrHtml === "string") {
+    // Called as (html, outputPath) — manage browser internally
+    const browser = await launchBrowser();
+    try {
+      const page = await browser.newPage();
+      await page.setViewportSize({ width: 1920, height: 1080 });
+      const pres = (await htmlToPptx(page, pageOrHtml)) as { writeFile: (opts: { fileName: string }) => Promise<void> };
+      await pres.writeFile({ fileName: htmlOrPath });
+    } finally {
+      await browser.close();
+    }
+  } else {
+    // Called as (page, html, outputPath)
+    const pres = (await htmlToPptx(pageOrHtml, htmlOrPath)) as { writeFile: (opts: { fileName: string }) => Promise<void> };
+    await pres.writeFile({ fileName: maybePath! });
+  }
 }
 
 /**
  * Convert HTML to PPTX and return as a Buffer.
+ * When called without a Page, launches and closes a browser automatically.
  */
+export async function htmlToPptxBuffer(html: string): Promise<Buffer>;
+export async function htmlToPptxBuffer(page: Page, html: string): Promise<Buffer>;
 export async function htmlToPptxBuffer(
-  page: Page,
-  html: string
+  pageOrHtml: Page | string,
+  maybeHtml?: string
 ): Promise<Buffer> {
-  const pres = (await htmlToPptx(page, html)) as { write: (opts: { outputType: string }) => Promise<unknown> };
-  const result = await pres.write({ outputType: "nodebuffer" });
-  return result as Buffer;
+  if (typeof pageOrHtml === "string") {
+    // Called as (html) — manage browser internally
+    const browser = await launchBrowser();
+    try {
+      const page = await browser.newPage();
+      await page.setViewportSize({ width: 1920, height: 1080 });
+      const pres = (await htmlToPptx(page, pageOrHtml)) as { write: (opts: { outputType: string }) => Promise<unknown> };
+      const result = await pres.write({ outputType: "nodebuffer" });
+      return result as Buffer;
+    } finally {
+      await browser.close();
+    }
+  } else {
+    // Called as (page, html)
+    const pres = (await htmlToPptx(pageOrHtml, maybeHtml!)) as { write: (opts: { outputType: string }) => Promise<unknown> };
+    const result = await pres.write({ outputType: "nodebuffer" });
+    return result as Buffer;
+  }
 }
 
 /**

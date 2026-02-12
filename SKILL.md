@@ -44,9 +44,21 @@
 
 ---
 
-## IR Input Schema
+## IR Input (Optional)
 
-The IR specifies what the slide should contain. You generate HTML that implements it.
+If an `input.json` IR file is provided, use it to guide your HTML. If not, just write HTML directly — the validator auto-infers element types and priorities from the rendered HTML.
+
+**Auto-inference rules** (when no IR provided):
+
+| HTML pattern | Inferred type | Priority |
+|---|---|---|
+| Contains `<img>`, no text | `image` | 50 |
+| Contains `<ul>`/`<ol>` | `bullets` | 60 |
+| No text, has background-color | `decoration` | 0 |
+| Bold + font ≥ 28px | `title` | 100 |
+| Everything else | `text` | 60 |
+
+**IR schema** (when provided):
 
 ```json
 {
@@ -70,8 +82,6 @@ The IR specifies what the slide should contain. You generate HTML that implement
 | `content` | Text to render, or image URL |
 | `layout` | Suggested position/size — adjust if diagnostics flags defects |
 | `style` | Suggested styling — respect minimum font sizes |
-
-Layout and style are **suggestions**, not mandates. The diagnostics engine compares what actually rendered against the IR.
 
 **Element types:**
 
@@ -111,8 +121,9 @@ All commands run from `/tools/pptagent`:
 # Flatten flexbox → absolute
 cd /tools/pptagent && npx tsx scripts/flatten.ts input.html abs.html
 
-# Validate layout
-cd /tools/pptagent && npx tsx scripts/check-slide.ts abs.html input.json
+# Validate layout (saves dom/diag/screenshot to rollout dir)
+# input.json is optional — omit it to auto-infer types from HTML
+cd /tools/pptagent && npx tsx scripts/check-slide.ts abs.html [input.json] --outdir <rolloutDir> --iter 0
 
 # Convert to PPTX
 cd /tools/pptagent && npx tsx scripts/to-pptx.ts final.html output.pptx

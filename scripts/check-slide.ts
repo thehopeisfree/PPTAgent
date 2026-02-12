@@ -1,10 +1,13 @@
 #!/usr/bin/env npx tsx
 /**
- * check-slide.ts — Validate an HTML slide against an IR specification.
+ * check-slide.ts — Validate an HTML slide.
  *
  * Usage:
- *   npx tsx scripts/check-slide.ts <slide.html> <input.json> [screenshot.png]
- *   npx tsx scripts/check-slide.ts <slide.html> <input.json> --outdir <dir> --iter <n>
+ *   npx tsx scripts/check-slide.ts <slide.html> [input.json] [screenshot.png]
+ *   npx tsx scripts/check-slide.ts <slide.html> [input.json] --outdir <dir> --iter <n>
+ *
+ * If input.json is omitted, element types and priorities are inferred from the
+ * rendered HTML (bold+large→title, <ul>→bullets, <img>→image, etc.).
  *
  * Options:
  *   --outdir <dir>  Save all artifacts (dom, diag, screenshot) to rollout dir
@@ -25,6 +28,7 @@ import { parseIR } from "../src/schema/ir.js";
 import { launchBrowser } from "../src/utils/browser.js";
 import { extractDOM, screenshotSlide } from "../src/extraction/dom-extractor.js";
 import { diagnose } from "../src/diagnostics/engine.js";
+import { inferIR } from "../src/ir/infer-ir.js";
 import { rolloutPaths, writeJSON, writeFile } from "../src/utils/fs-helpers.js";
 
 // ── Parse args ──
@@ -47,11 +51,12 @@ const htmlPath = positional[0];
 const irPath = positional[1];
 const screenshotPath = positional[2]; // legacy: 3rd positional arg
 
-if (!htmlPath || !irPath) {
-  console.error("Usage: npx tsx scripts/check-slide.ts <slide.html> <input.json> [screenshot.png]");
-  console.error("       npx tsx scripts/check-slide.ts <slide.html> <input.json> --outdir <dir> --iter <n>");
+if (!htmlPath) {
+  console.error("Usage: npx tsx scripts/check-slide.ts <slide.html> [input.json] [screenshot.png]");
+  console.error("       npx tsx scripts/check-slide.ts <slide.html> [input.json] --outdir <dir> --iter <n>");
   console.error("");
-  console.error("Validates the HTML slide against the IR spec and prints diagnostics JSON.");
+  console.error("Validates the HTML slide and prints diagnostics JSON.");
+  console.error("If input.json is omitted, element types and priorities are inferred from HTML.");
   console.error("Exit 0 = clean, exit 1 = has defects, exit 2 = error.");
   process.exit(2);
 }
@@ -60,7 +65,7 @@ if (!fs.existsSync(htmlPath)) {
   console.error(`Error: HTML file not found: ${htmlPath}`);
   process.exit(2);
 }
-if (!fs.existsSync(irPath)) {
+if (irPath && !fs.existsSync(irPath)) {
   console.error(`Error: IR file not found: ${irPath}`);
   process.exit(2);
 }
@@ -69,8 +74,6 @@ if (!fs.existsSync(irPath)) {
 async function main() {
   // Read inputs
   const html = fs.readFileSync(path.resolve(htmlPath!), "utf-8");
-  const irData = JSON.parse(fs.readFileSync(path.resolve(irPath!), "utf-8"));
-  const ir = parseIR(irData);
 
   // Launch browser
   const browser = await launchBrowser();
@@ -79,6 +82,16 @@ async function main() {
 
   // Extract DOM
   const dom = await extractDOM(page, html);
+
+  // Build IR: from file if provided, otherwise infer from rendered HTML
+  let ir;
+  if (irPath) {
+    const irData = JSON.parse(fs.readFileSync(path.resolve(irPath), "utf-8"));
+    ir = parseIR(irData);
+  } else {
+    ir = await inferIR(page, dom);
+    console.error("No input.json provided — IR inferred from HTML.");
+  }
 
   // Screenshot
   const png = await screenshotSlide(page);

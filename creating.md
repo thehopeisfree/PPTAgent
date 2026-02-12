@@ -83,7 +83,7 @@ You may use any CSS layout inside `#slide` — flexbox, grid, padding, margins. 
 
 ## Element Rules
 
-Every element is a `<div>` inside `#slide` with a unique `data-eid` matching the IR.
+Every element is a `<div>` inside `#slide` with a unique `data-eid`. If an IR is provided, match its `eid` values. Otherwise, choose descriptive names (e.g., `e_title`, `e_bullets`, `e_photo`).
 
 | Type | Pattern | Notes |
 |------|---------|-------|

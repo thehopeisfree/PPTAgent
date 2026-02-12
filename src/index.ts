@@ -122,6 +122,16 @@ export type { InputElement } from "./debug/synthetic-ir.js";
 export { injectDebugOverlay, toggleLayer, removeDebugOverlay } from "./debug/overlay.js";
 export type { OverlayOptions, OverlayLayer } from "./debug/overlay.js";
 
+// IR inference (auto-generate IR from rendered HTML)
+export {
+  inferIR,
+  inferIRFromDOM,
+  inferType,
+  inferPriority,
+  extractTypeSignals,
+} from "./ir/infer-ir.js";
+export type { TypeSignal } from "./ir/infer-ir.js";
+
 // Flatten (flexbox → absolute)
 export { flattenHTML } from "./flatten/flatten-html.js";
 export type { FlattenedElement } from "./flatten/flatten-html.js";
