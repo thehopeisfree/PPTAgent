@@ -23,6 +23,7 @@ Description → HTML (flexbox) → Flatten → Absolute HTML → Playwright Rend
 - [Core Computation Logic](#core-computation-logic)
 - [Deployment](#deployment)
 - [Programmatic API](#programmatic-api)
+- [RL Training](#rl-training)
 - [Quick Start](#quick-start)
 - [CLI Scripts](#cli-scripts)
 - [Project Structure](#project-structure)
@@ -110,7 +111,7 @@ The model interacts with PPTAgent through CLI scripts. The internal pipeline:
 |---|---|---|
 | Contains `<img>`, no text | `image` | 50 |
 | Contains `<ul>`/`<ol>` | `bullets` | 60 |
-| No text, has background-color | `decoration` | 0 |
+| No text, has background (color/gradient/image) | `decoration` | 0 |
 | Bold + font >= 28px | `title` | 100 |
 | Everything else | `text` | 60 |
 
@@ -192,7 +193,7 @@ Every defect includes a pre-computed, validated hint:
 
 | Defect | Hint |
 |---|---|
-| `overlap` | Cheapest of 4 directional moves to clear the other element's safeBox |
+| `overlap` | Cheapest of 4 directional moves to clear the other element's safeBox, with edge-proximity awareness (auto-caps `suggested_w`/`suggested_h` if the move would breach `EDGE_MARGIN_PX`) |
 | `content_overflow` | `suggested_h = contentBox.h + 8px` (or `suggested_w`) |
 | `out_of_bounds` | `suggested_x/y` to pull within bounds, or `suggested_w/h` to shrink |
 | `font_too_small` | `suggested_fontSize = tier minimum` |
@@ -238,10 +239,20 @@ Runs after budget clamping but before slide bounds clamping.
 ### Package for Container
 
 ```bash
-bash scripts/pack.sh                    # -> pptagent.tar.gz (96K)
+bash scripts/pack.sh                    # -> pptagent.tar.gz (~160K)
 ```
 
-The tarball contains `dist/`, `package.json`, `package-lock.json`, `SKILL.md`, `creating.md`, `fixing.md`, and `scripts/container-setup.sh`. No source code or dev dependencies.
+The tarball contains **only CLI entry points** — no `dist/`, no `src/`, no dev dependencies:
+
+```
+bin/                          # esbuild-bundled CLI scripts (self-contained)
+package.json                  # stripped: runtime deps only, no main/exports
+package-lock.json             # lockfile for reproducible installs
+SKILL.md, creating.md, fixing.md  # model context docs
+scripts/container-setup.sh    # container bootstrap
+```
+
+The `package.json` in the tarball is intentionally stripped of `main`, `types`, and `exports` fields so that LLM agents cannot discover or import internal modules — they can only interact through the `bin/` CLI scripts.
 
 ### Container Bootstrap
 
@@ -296,6 +307,67 @@ The loop driver handles stall detection, rollback to best prior state, patch fin
 
 ---
 
+## RL Training
+
+PPTAgent's diagnostics engine is a deterministic, verifiable reward function — making it a natural fit for Reinforcement Learning with Verifiable Rewards (RLVR) and agentic RL training.
+
+### PPTAgent as an RL Environment
+
+| RL Concept | PPTAgent Mapping |
+|---|---|
+| **State** | `abs.html` (current slide layout) |
+| **Action** | CSS edits to the HTML (applying hints) |
+| **Environment** | Playwright render + diagnostics engine |
+| **Reward** | `defect_count`, `total_severity` (exact numerical) |
+| **Episode** | One rollout (`trace.jsonl` records the full trajectory) |
+| **Termination** | `exit 0` = success, stall = rollback |
+
+### Why This is Better Than Typical RLVR
+
+Standard RLVR (e.g., math problems) provides a binary terminal reward: answer correct or not. PPTAgent provides:
+
+- **Dense intermediate rewards** — every iteration returns `defect_count` and `total_severity`, not just the final result
+- **Decomposable signals** — 7 defect types with independent severity scores, enabling fine-grained credit assignment
+- **Structured hints** — pre-computed fix suggestions that serve as reward shaping, guiding the agent toward the solution
+- **Deterministic verification** — same input always produces same diagnostics, no stochastic reward noise
+
+### Two-Level Optimization
+
+```
+Outer loop (training-time RLVR)
+│  Sample diverse slide descriptions as prompts
+│  Run rollout episodes through CLI
+│  Reward = f(convergence speed, final severity, budget overrides)
+│  Update LLM weights via GRPO/PPO
+│
+└── Inner loop (inference-time ICRL)     ← current system
+    │  LLM reads diagnostics JSON (observation)
+    │  Generates HTML edits (action)
+    │  Diagnostics returns new defects (reward)
+    │  Repeats 1-3 iterations
+```
+
+The **inner loop** (what PPTAgent does today) is in-context self-refinement at inference time. An **outer loop** can use rollout trajectories as training data to improve the base model's layout generation skills via RLVR.
+
+### Reward Design
+
+The `trace.jsonl` already captures per-iteration metrics. A reward function could combine:
+
+```
+reward = -total_severity                     # primary signal
+       + bonus_for_early_convergence         # fewer iterations = better
+       + penalty_for_budget_clamping         # overrides indicate crude edits
+       + penalty_for_taboo_hits              # repeated failed strategies
+```
+
+### Integration Points
+
+- **CLI as environment interface** — the tarball's `bin/check-slide.js` (exit code + JSON stdout) can be called from any RL framework (Python, Node, shell) without code coupling
+- **Programmatic API for tighter loops** — `createSession` / `initRollout` / `stepRollout` provide in-process control for frameworks like Agent Lightning that need per-step access
+- **Rollout artifacts** — `trace.jsonl` contains `(iter, defect_count, total_severity, action)` tuples, directly usable as RLVR trajectories
+
+---
+
 ## Quick Start
 
 ### Install
@@ -308,10 +380,13 @@ npx playwright install chromium
 ### Run Tests
 
 ```bash
-npm test                    # all tests (Vitest)
+npm test                    # all tests (212 tests, ~13s)
 npx tsc --noEmit            # typecheck
 npx vitest run tests/patch  # just patch tests
+npx vitest run tests/e2e    # e2e: tarball → CLI workflow → convergence
 ```
+
+The **e2e test** (`tests/e2e/cli-workflow.test.ts`) simulates the full agent workflow: builds tarball, extracts to temp dir, writes HTML with intentional defects (including gradient decoration), runs the complete `flatten → check-slide loop → to-pptx` pipeline using only CLI commands, and verifies convergence with no hint cycles.
 
 ### Run Demos
 
@@ -408,7 +483,11 @@ src/
     └── fs-helpers.ts                     # File I/O for rollout directories
 
 scripts/                                  # CLI tools (flatten, check-slide, to-pptx, etc.)
-tests/                                    # Vitest tests mirroring src/ structure
+tests/
+├── e2e/
+│   └── cli-workflow.test.ts              # Full tarball CLI workflow: flatten → diagnose → pptx
+├── diagnostics/                          # Unit tests for each detector
+├── ...                                   # Mirrors src/ structure
 SKILL.md                                  # Skill router (progressive disclosure)
 creating.md                               # Phase 1: flexbox HTML creation guide
 fixing.md                                 # Phase 2: defect fixing guide
