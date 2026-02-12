@@ -48,16 +48,36 @@ npx esbuild \
   --external:playwright --external:pptxgenjs
 echo "  bin/ ready ($(ls bin/*.js | wc -l) files)"
 
-# 4. Create tarball (bin/ only — no dist/, no scripts/*.ts)
-echo "[4/4] Packing tarball..."
-tar czf "$OUTPUT" \
-  bin/ \
-  package.json \
-  package-lock.json \
-  SKILL.md \
-  creating.md \
-  fixing.md \
-  scripts/container-setup.sh
+# 4. Stage files for tarball (stripped package.json — no main/exports)
+echo "[4/5] Staging tarball contents..."
+STAGE=$(mktemp -d)
+trap 'rm -rf "$STAGE"' EXIT
+
+cp -r bin/ "$STAGE/bin/"
+cp package-lock.json SKILL.md creating.md fixing.md "$STAGE/"
+mkdir -p "$STAGE/scripts"
+cp scripts/container-setup.sh "$STAGE/scripts/"
+
+# Generate stripped package.json: no main/types/exports/devDependencies/scripts
+# so agents see no importable entry points — CLI only
+node --input-type=commonjs -e "
+  const pkg = JSON.parse(require('fs').readFileSync('package.json', 'utf8'));
+  const slim = {
+    name: pkg.name,
+    version: pkg.version,
+    description: pkg.description,
+    type: pkg.type,
+    dependencies: pkg.dependencies,
+  };
+  require('fs').writeFileSync('package.container.json', JSON.stringify(slim, null, 2) + '\n');
+"
+cp package.container.json "$STAGE/package.json"
+rm -f package.container.json
+echo "  Staged (package.json stripped of main/exports/devDependencies)"
+
+# 5. Create tarball from staging directory
+echo "[5/5] Packing tarball..."
+tar czf "$OUTPUT" -C "$STAGE" .
 
 SIZE=$(du -h "$OUTPUT" | cut -f1)
 echo ""

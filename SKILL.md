@@ -172,7 +172,7 @@ If an `input.json` IR file is provided, use it to guide your HTML — match `eid
 |---|---|---|
 | Contains `<img>`, no text | `image` | 50 |
 | Contains `<ul>`/`<ol>` | `bullets` | 60 |
-| No text, has background-color | `decoration` | 0 |
+| No text, has background (color/gradient/image) | `decoration` | 0 |
 | Bold + font ≥ 28px | `title` | 100 |
 | Everything else | `text` | 60 |
 
