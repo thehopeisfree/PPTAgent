@@ -44,6 +44,7 @@ import { computeFingerprint } from "./src/driver/loop-driver.js";
 //    5. Caption font 10px < 16px min
 //    6. Accent bar (decoration) overlaps everything — but exempt
 //    7. Callout is at zIndex 20, overlaps photo2 → occlusion_suspected warning
+//    8. Subtitle has h=120 for a single line of ~25px text → content_underflow
 
 const slide = parseIR({
   slide: { w: 1280, h: 720 },
@@ -81,8 +82,9 @@ const slide = parseIR({
       type: "text",
       priority: 70,
       content: "Engineering & Product Division — Confidential",
-      // Problem: starts at y=80, title bottom is ~100 → tight, safeBoxes will collide
-      layout: { x: 40, y: 80, w: 600, h: 36, zIndex: 10 },
+      // Problem 1: starts at y=80, title bottom is ~100 → tight, safeBoxes will collide
+      // Problem 2: h=120 for a single line of text (~25px) → content_underflow (ratio ~4.8)
+      layout: { x: 40, y: 80, w: 600, h: 120, zIndex: 10 },
       style: { fontSize: 18, lineHeight: 1.3, color: "#64748b" },
     },
     // ── key metrics bullets ──
@@ -149,8 +151,8 @@ const slide = parseIR({
 // ── A patch that an LLM might produce after seeing the diagnostics ──
 const fixPatch = parsePatch({
   edits: [
-    // Fix subtitle position (move below title safeBox)
-    { eid: "e_subtitle", layout: { y: 108 } },
+    // Fix subtitle position (move below title safeBox) + shrink oversized container
+    { eid: "e_subtitle", layout: { y: 108, h: 36 } },
     // Fix metrics: move down, increase height, bump font to minimum
     { eid: "e_metrics", layout: { y: 155, h: 360 }, style: { fontSize: 20 } },
     // Fix photo2: pull left within bounds
