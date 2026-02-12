@@ -115,12 +115,11 @@ Your HTML must follow this exact structure. The diagnostics pipeline depends on 
 After generating HTML, validate it with PPTAgent's diagnostics:
 
 ```typescript
-import { chromium } from "playwright";
-import { parseIR, extractDOM, diagnose } from "./src/index.js";
+import { launchBrowser, parseIR, extractDOM, diagnose } from "/tools/pptagent/dist/index.js";
 import * as fs from "node:fs";
 
 // Launch browser (reuse across iterations)
-const browser = await chromium.launch();
+const browser = await launchBrowser();
 const page = await browser.newPage();
 await page.setViewportSize({ width: 1920, height: 1080 });
 
@@ -335,7 +334,7 @@ The IR's `layout` and `style` are **suggestions**, not mandates. If the suggeste
 For visual debugging during development:
 
 ```typescript
-import { injectDebugOverlay, screenshotSlide } from "./src/index.js";
+import { injectDebugOverlay, screenshotSlide } from "/tools/pptagent/dist/index.js";
 
 // Inject colored overlays showing bboxes, safe boxes, and defects
 await page.setContent(html, { waitUntil: "load" });

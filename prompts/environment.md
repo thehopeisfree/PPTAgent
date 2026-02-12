@@ -1,68 +1,116 @@
 # Environment
 
-You are in a container with Node.js, TypeScript (tsx), and Playwright (Chromium).
+You are in a CaaS container with Node.js and system Chromium.
 
-## Available Commands
+## PPTAgent Location
 
-### Flatten flexbox HTML to absolute positioning
-```bash
-npx tsx scripts/flatten.ts <input.html> <output.html>
-```
-- Renders flexbox/natural HTML in Playwright, extracts computed positions
-- Produces equivalent HTML with all elements using `position: absolute`
-- Use this after generating your initial flexbox HTML
+PPTAgent is pre-installed at `/tools/pptagent`. Import from the compiled package:
 
-### Validate a slide layout
-```bash
-npx tsx scripts/check-slide.ts <slide.html> <input.json> [screenshot.png]
-```
-- Reads your HTML slide and the IR input specification
-- Renders via Playwright, extracts DOM measurements, runs diagnostics
-- Prints diagnostics JSON to stdout
-- Exit 0 = no defects (clean), exit 1 = has defects, exit 2 = error
-- Optional 3rd argument: save a screenshot of the rendered slide
-
-### Convert HTML to PPTX
-```bash
-npx tsx scripts/to-pptx.ts <slide.html> <output.pptx>
-```
-- Converts an absolute-positioned HTML slide to PowerPoint format
-- Uses PptxGenJS: positions, colors, fonts are converted precisely
-- Remote image URLs become placeholder shapes (use local paths or data URIs for real images)
-
-### Run a TypeScript script
-```bash
-npx tsx <script.ts>
-```
-
-## Available Libraries
-
-Import from `./src/index.js` (PPTAgent):
 ```typescript
 import {
-  // Schema parsing
-  parseIR,              // Validate & parse IR JSON → IRDocument
+  // Browser
+  launchBrowser,          // Launches system Chromium (reads CHROMIUM_PATH)
+  // Schema
+  parseIR,                // Validate & parse IR JSON → IRDocument
+  parsePatch,             // Parse patch document
+  // Rendering
+  renderHTML,             // IRDocument → full HTML string
   // DOM extraction (needs Playwright page)
-  extractDOM,           // Load HTML into page + extract measurements
-  screenshotSlide,      // Screenshot the #slide element
+  extractDOM,             // Load HTML into page + extract measurements
+  screenshotSlide,        // Screenshot the #slide element → Buffer (PNG)
   // Diagnostics
-  diagnose,             // Compare DOM vs IR → defects + hints
-} from "./src/index.js";
+  diagnose,               // Compare DOM vs IR → defects + hints
+  // Patch
+  applyPatch,             // Apply patch to IR → new IR + overrides
+  // Flatten
+  flattenHTML,            // Flexbox HTML → absolute-positioned HTML (needs page)
+  // PPTX
+  htmlToPptxFile,         // HTML → PPTX file
+  // File utilities
+  rolloutPaths,           // Compute artifact paths for a rollout iteration
+  readJSON, writeJSON, writeFile,
+} from '/tools/pptagent/dist/index.js';
 ```
 
-Import from `playwright`:
+## Browser Setup
+
+Always use `launchBrowser()` — it uses the system Chromium with correct flags:
+
 ```typescript
-import { chromium } from "playwright";
-const browser = await chromium.launch();
+const browser = await launchBrowser();
 const page = await browser.newPage();
 await page.setViewportSize({ width: 1920, height: 1080 });
+
+// ... do work ...
+
+await browser.close();
 ```
 
-## File Paths
+Do NOT use `chromium.launch()` directly.
 
-- IR input: provided per task (JSON file)
-- Your HTML output: write to the designated output path
-- Screenshots: optional, for debugging
+## Rollout Directory
+
+Write all intermediate artifacts to `/home/oai/share/rollouts/<rollout_id>/`:
+
+```typescript
+const rolloutDir = '/home/oai/share/rollouts/rollout_001';
+const paths = rolloutPaths(rolloutDir, 0);  // iter 0
+// paths.ir    → /home/oai/share/rollouts/rollout_001/ir_0.json
+// paths.html  → /home/oai/share/rollouts/rollout_001/out_0.html
+// paths.render → /home/oai/share/rollouts/rollout_001/render_0.png
+// paths.dom   → /home/oai/share/rollouts/rollout_001/dom_0.json
+// paths.diag  → /home/oai/share/rollouts/rollout_001/diag_0.json
+// paths.patch → /home/oai/share/rollouts/rollout_001/patch_0.json
+// paths.trace → /home/oai/share/rollouts/rollout_001/trace.jsonl
+```
+
+## Full Workflow (API)
+
+```typescript
+import {
+  launchBrowser, parseIR, extractDOM, diagnose,
+  screenshotSlide, flattenHTML,
+  rolloutPaths, writeJSON, writeFile,
+} from '/tools/pptagent/dist/index.js';
+import * as fs from 'node:fs';
+
+// 1. Read IR input
+const ir = parseIR(JSON.parse(fs.readFileSync('input.json', 'utf-8')));
+
+// 2. Launch browser (reuse across iterations)
+const browser = await launchBrowser();
+const page = await browser.newPage();
+await page.setViewportSize({ width: 1920, height: 1080 });
+
+// 3. Generate initial HTML (flexbox), then flatten to absolute
+const flexboxHTML = '...';  // your generated HTML
+const { html: absHTML } = await flattenHTML(page, flexboxHTML);
+
+// 4. Save initial artifacts
+const rolloutDir = '/home/oai/share/rollouts/rollout_001';
+const p0 = rolloutPaths(rolloutDir, 0);
+await writeFile(p0.html, absHTML);
+
+// 5. Extract DOM + diagnose
+const dom = await extractDOM(page, absHTML);
+await writeJSON(p0.dom, dom);
+const png = await screenshotSlide(page);
+await writeFile(p0.render, png);
+const diag = diagnose(dom, ir);
+await writeJSON(p0.diag, diag);
+
+// 6. Check results
+if (diag.summary.defect_count === 0) {
+  console.log('Clean!');
+} else {
+  // Read defects + hints, edit the HTML, re-run from step 5
+  for (const d of diag.defects) {
+    console.log(`[${d.type}] ${d.eid ?? d.owner_eid} — hint:`, d.hint);
+  }
+}
+
+await browser.close();
+```
 
 ## Slide Dimensions
 
