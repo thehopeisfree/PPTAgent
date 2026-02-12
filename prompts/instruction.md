@@ -1,43 +1,28 @@
-<!-- This file is injected by the RL framework at runtime. It is NOT included in the PPTAgent tarball. -->
+<!-- Injected by the RL framework at runtime. NOT included in the PPTAgent tarball. -->
 
 # Slide Generation Task
 
-Given a slide description, produce:
-- **`/home/oai/share/answer.pptx`** — the final 1280×720 slide
+Produce **`/home/oai/share/answer.pptx`** — a single 1280×720 slide from the description at the end of this prompt.
 
-⚠️ **Read `/shared/pptagent-skill.md` first.** It contains the full workflow, HTML format, constraints, and CLI commands. Follow it exactly.
+## Environment
 
-## File Paths
+- Node.js, Python, Chromium are pre-installed
+- PPTAgent CLI is at `/tools/pptagent/bin/` — use only the CLI commands documented in the skill docs
+- **`apply_patch`** is on PATH — use it whenever you need to edit a file
 
-| File | Path | Notes |
-|------|------|-------|
-| Skill docs | `/shared/pptagent-skill.md` | Read this first |
-| Initial HTML | `/home/oai/share/slide.html` | **You create this** (Step 2 in skill docs) |
-| Flattened HTML | `/home/oai/share/abs.html` | Produced by flatten CLI |
-| Final PPTX | `/home/oai/share/answer.pptx` | Produced by to-pptx CLI |
-| Rollout dir | `/home/oai/share/rollout` | For diagnostics artifacts |
+## Files
 
-## Workflow Summary
+| File | Path | Action |
+|------|------|--------|
+| Skill docs | `/shared/pptagent-skill.md` | Read first |
+| Initial HTML | `/home/oai/share/slide.html` | You create |
+| Flattened HTML | `/home/oai/share/abs.html` | Read + edit in diag loop |
+| Final PPTX | `/home/oai/share/answer.pptx` | Output |
+| Rollout dir | `/home/oai/share/rollout` | Output (auto-populated) |
 
-Follow the steps in `/shared/pptagent-skill.md`. The key commands are:
+## Task
 
-```bash
-# 1. Write slide.html (you do this manually — see skill docs for template)
-
-# 2. Flatten to absolute positioning
-cd /tools/pptagent && node bin/flatten.js /home/oai/share/slide.html /home/oai/share/abs.html
-
-# 3. Run diagnostics (loop until exit 0 — see skill docs Step 5)
-cd /tools/pptagent && node bin/check-slide.js /home/oai/share/abs.html --outdir /home/oai/share/rollout --iter 0
-
-# 4. Convert to PPTX
-cd /tools/pptagent && node bin/to-pptx.js /home/oai/share/abs.html /home/oai/share/answer.pptx
-```
-
-## Visual QA
-
-After producing answer.pptx, render to images and verify:
-
-```bash
-python /home/oai/share/render_slides.py /home/oai/share/answer.pptx
-```
+1. **Read** `/shared/pptagent-skill.md` — it has the HTML template, constraints, and all CLI commands
+2. **Create** `slide.html` → **flatten** → **diagnose & fix loop** → **convert to PPTX** (follow skill docs)
+3. **Archive**: `tar -czf /home/oai/share/pptagent_rollout.tar.gz -C /home/oai/share rollout`
+4. **Verify**: `python /home/oai/share/render_slides.py /home/oai/share/answer.pptx`
