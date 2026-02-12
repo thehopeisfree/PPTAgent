@@ -39,6 +39,7 @@ LLM ──JSON Patch──→ IR ──HTML──→ Playwright Render
 | `HIGH_PRIO_MOVE_PX` | 48 | Max absolute move per patch for position props (priority ≥ 80) |
 | `TEXT_OVERLAP_SEVERITY_MULT` | 2 | Severity multiplier when overlap involves text |
 | `TOPOLOGY_SEVERITY` | 5000 | Fixed severity for layout topology violations |
+| `EDGE_MARGIN_PX` | 24 | Min distance from element edge to slide boundary (px) |
 
 ## File Structure Per Rollout
 
