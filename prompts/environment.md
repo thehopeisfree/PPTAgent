@@ -1,3 +1,5 @@
+<!-- This file is injected by the RL framework at runtime. It is NOT included in the PPTAgent tarball. -->
+
 # Environment
 
 You are in a CaaS container with Node.js and system Chromium.

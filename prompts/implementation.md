@@ -1,3 +1,5 @@
+<!-- This file is injected by the RL framework at runtime. It is NOT included in the PPTAgent tarball. -->
+
 # Implementation: HTML Slide Generation
 
 ## Your Task
