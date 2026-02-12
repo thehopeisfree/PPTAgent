@@ -38,6 +38,13 @@ export interface FontTooSmallDetails {
   min: number;
 }
 
+/** Edge proximity defect details */
+export interface EdgeProximityDetails {
+  edge: "left" | "right" | "top" | "bottom";
+  distance_px: number;
+  threshold_px: number;
+}
+
 /** Layout topology violation details */
 export interface LayoutTopologyDetails {
   rule: string;
@@ -52,14 +59,16 @@ export type DefectDetails =
   | OutOfBoundsDetails
   | OverlapDetails
   | FontTooSmallDetails
-  | LayoutTopologyDetails;
+  | LayoutTopologyDetails
+  | EdgeProximityDetails;
 
 export type DefectType =
   | "layout_topology"
   | "content_overflow"
   | "out_of_bounds"
   | "overlap"
-  | "font_too_small";
+  | "font_too_small"
+  | "edge_proximity";
 
 /** A detected layout defect */
 export interface Defect {

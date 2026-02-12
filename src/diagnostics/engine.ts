@@ -6,6 +6,7 @@ import { detectContentOverflow } from "./detectors/content-overflow.js";
 import { detectOutOfBounds } from "./detectors/out-of-bounds.js";
 import { detectOverlaps } from "./detectors/overlap.js";
 import { detectFontTooSmall } from "./detectors/font-too-small.js";
+import { detectEdgeProximity } from "./detectors/edge-proximity.js";
 import { analyzeConflicts } from "./hints/conflict-solver.js";
 import { validateHint, annotateBudgetConstraints } from "./hints/hint-calculator.js";
 import { totalSeverity } from "./severity.js";
@@ -47,6 +48,13 @@ export function diagnose(dom: DOMDocument, ir: IRDocument): DiagDocument {
   for (const domEl of dom.elements) {
     const oobDefects = detectOutOfBounds(domEl);
     defects.push(...oobDefects);
+  }
+
+  // 4.5 edge_proximity (between OOB and overlap)
+  for (const domEl of dom.elements) {
+    const irEl = irMap.get(domEl.eid);
+    if (!irEl) continue;
+    defects.push(...detectEdgeProximity(domEl, irEl));
   }
 
   // 5. overlap (defects) + occlusion_suspected (warnings)

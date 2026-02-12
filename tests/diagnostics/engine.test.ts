@@ -386,6 +386,48 @@ describe("Diagnostics Engine", () => {
     }
   });
 
+  it("detects edge_proximity when element is flush with slide edge", () => {
+    const ir: IRDocument = {
+      slide: { w: 1280, h: 720 },
+      elements: [
+        {
+          eid: "e_photo",
+          type: "image",
+          priority: 60,
+          content: "photo.jpg",
+          layout: { x: 780, y: 100, w: 500, h: 300, zIndex: 10 },
+          style: {},
+        },
+      ],
+    };
+    const dom: DOMDocument = {
+      slide: { w: 1280, h: 720 },
+      safe_padding: 8,
+      elements: [
+        {
+          eid: "e_photo",
+          bbox: { x: 780, y: 100, w: 500, h: 300 },
+          safeBox: { x: 772, y: 92, w: 516, h: 316 },
+          contentBox: null,
+          zIndex: 10,
+          computed: { fontSize: 16, lineHeight: 1.5 },
+        },
+      ],
+    };
+
+    const diag = diagnose(dom, ir);
+    const edgeDefects = diag.defects.filter((d) => d.type === "edge_proximity");
+    expect(edgeDefects.length).toBeGreaterThanOrEqual(1);
+    const rightEdge = edgeDefects.find(
+      (d) => (d.details as { edge: string }).edge === "right",
+    );
+    expect(rightEdge).toBeDefined();
+    expect(rightEdge!.severity).toBe(24);
+    expect(rightEdge!.hint).toBeDefined();
+    expect(rightEdge!.hint!.action).toBe("nudge_from_edge");
+    expect(rightEdge!.hint!.suggested_x).toBeDefined();
+  });
+
   it("builds conflict graph for overlapping elements", () => {
     const ir: IRDocument = {
       slide: { w: 1280, h: 720 },

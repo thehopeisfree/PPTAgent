@@ -51,6 +51,9 @@ export const TOPOLOGY_SEVERITY = 5000;
 /** Text element types (used for severity multiplier) */
 export const TEXT_TYPES = new Set(["title", "text", "bullets"]);
 
+/** Edge proximity threshold — elements closer than this to the slide edge are flagged (px) */
+export const EDGE_MARGIN_PX = 24;
+
 /** Tolerance for image aspect ratio deviation (1%) */
 export const IMAGE_ASPECT_RATIO_EPS = 0.01;
 
