@@ -4,10 +4,14 @@ An automated layout correction toolkit for single-slide presentations. An LLM ge
 
 **Core idea:** LLMs are bad at pixel arithmetic but good at spatial reasoning over structured feedback. This system does the math, the model makes the decisions.
 
+**Two-phase workflow:** The model writes HTML with flexbox layout (easy to get right). The system flattens it to absolute positioning (mechanical), then validates and iterates on the absolute-positioned HTML using diagnostic hints.
+
 ```
-LLM ──JSON Patch──→ IR ──HTML──→ Playwright Render
- ↑                                      ↓
- └── Defects + Hints ←── Diagnostics ←── DOM Extraction (Range API)
+Description → HTML (flexbox) → Flatten → Absolute HTML → Playwright Render
+                                              ↑                    ↓
+                                         Fix CSS values    DOM Extraction
+                                              ↑                    ↓
+                                         Defects + Hints ←── Diagnostics
 ```
 
 ---
@@ -17,9 +21,12 @@ LLM ──JSON Patch──→ IR ──HTML──→ Playwright Render
 - [Design Philosophy](#design-philosophy)
 - [Architecture](#architecture)
 - [Core Computation Logic](#core-computation-logic)
+- [Deployment](#deployment)
 - [RL Container Integration](#rl-container-integration)
 - [Quick Start](#quick-start)
+- [CLI Scripts](#cli-scripts)
 - [Project Structure](#project-structure)
+- [Skill Docs](#skill-docs)
 - [Constants Reference](#constants-reference)
 - [Extending the System](#extending-the-system)
 
@@ -66,7 +73,7 @@ Making priority dynamic would create feedback instability — lowering priority 
 
 ## Architecture
 
-### The Five Modules
+### Core Modules
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -124,7 +131,23 @@ Plus `occlusion_suspected` warnings for cross-zIndex overlaps (informational onl
 
 All enforcement is logged as `Override` records in the trace.
 
-**6. Loop Driver** (`src/driver/loop-driver.ts`) — Session-based refinement loop:
+**6. Flatten** (`src/flatten/flatten-html.ts`) — Converts flexbox/grid HTML to absolute-positioned HTML. Renders in Playwright, reads computed `left`, `top`, `width`, `height` for each `[data-eid]` element, rewrites to `position: absolute` with `overflow: visible`. One-way transform; after flattening, all edits happen on the absolute HTML.
+
+**7. IR Inference** (`src/ir/infer-ir.ts`) — Auto-generates a minimal IR document from rendered HTML when no `input.json` is provided. Runs a browser script to extract structural signals (has `<img>`, has `<ul>`, has background, font weight), then infers `type` and `priority`:
+
+| HTML pattern | Inferred type | Priority |
+|---|---|---|
+| Contains `<img>`, no text | `image` | 50 |
+| Contains `<ul>`/`<ol>` | `bullets` | 60 |
+| No text, has background-color | `decoration` | 0 |
+| Bold + font >= 28px | `title` | 100 |
+| Everything else | `text` | 60 |
+
+Diagnostics only uses `eid`, `type`, and `priority` from the IR — `content`, `layout`, and `style` are not read by the diagnostics engine (it uses DOM-extracted values instead).
+
+**8. PPTX Conversion** (`src/pptx/html-to-pptx.ts`) — Renders HTML in Playwright, extracts element bounding boxes/styles/text, then uses pptxgenjs to build a PowerPoint file. Maps elements to PPTX primitives: decoration → `addShape`, text/title → `addText`, bullets → `addText` with bullet markers, image → `addImage`. Conversion: 1280px = 10", so 1px = 0.0078125". Accepts either `(html, outputPath)` for standalone use or `(page, html, outputPath)` to reuse an existing browser page.
+
+**9. Loop Driver** (`src/driver/loop-driver.ts`) — Session-based refinement loop:
 - **Stop on success**: `defect_count == 0`
 - **Stop on stall**: 2 consecutive non-improving iterations (both defect_count and severity) -> rollback to best prior IR
 - **Stop on max iterations** (3): apply hard fallback (truncate, optionally hide lowest-priority element)
@@ -265,16 +288,40 @@ Sorted, deduplicated, joined with `|`. Non-improving patches are added to a sess
 
 ---
 
+## Deployment
+
+### Package for Container
+
+```bash
+bash scripts/pack.sh                    # -> pptagent.tar.gz (96K)
+```
+
+The tarball contains `dist/`, `package.json`, `package-lock.json`, `SKILL.md`, `creating.md`, `fixing.md`, and `scripts/container-setup.sh`. No source code or dev dependencies.
+
+### Container Bootstrap
+
+```bash
+tar xzf pptagent.tar.gz -C /tools/pptagent
+bash /tools/pptagent/scripts/container-setup.sh
+```
+
+`container-setup.sh` handles: npm install, Chromium setup (prefers system Chromium via `CHROMIUM_PATH`, falls back to Playwright install), font installation, and copies `SKILL.md` to `/shared/pptagent-skill.md`.
+
+**Environment variables** (all optional):
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `PPTAGENT_ROOT` | Parent of `scripts/` | Installation directory |
+| `SHARED_DIR` | `/shared` | Where to copy skill docs |
+| `CHROMIUM_PATH` | Auto-detected | Path to system Chromium binary |
+| `SKIP_FONTS` | `0` | Set `1` to skip font installation |
+| `SKIP_VERIFY` | `0` | Set `1` to skip smoke test |
+
+---
+
 ## RL Container Integration
 
 In an RL training setup, PPTAgent runs inside the container as the **environment**. The model is the **agent**. The loop looks like this:
-
-### Container Setup
-
-```bash
-npm install
-npx playwright install chromium
-```
 
 ### Per-Episode Loop
 
@@ -286,11 +333,11 @@ import {
   initRollout,
   stepRollout,
   checkPatch,
+  launchBrowser,
 } from "pptagent";
-import { chromium } from "playwright";
 
 // 1. Launch browser (once per container, reuse across episodes)
-const browser = await chromium.launch();
+const browser = await launchBrowser();  // uses CHROMIUM_PATH if set
 const page = await browser.newPage();
 await page.setViewportSize({ width: 1920, height: 1080 });
 
@@ -418,6 +465,21 @@ npm run build    # compile to dist/
 
 ---
 
+## CLI Scripts
+
+All scripts run from the repo root via `npx tsx scripts/<name>.ts`.
+
+| Script | Usage | Description |
+|---|---|---|
+| `flatten.ts` | `npx tsx scripts/flatten.ts <input.html> <output.html>` | Convert flexbox HTML to absolute positioning |
+| `check-slide.ts` | `npx tsx scripts/check-slide.ts <slide.html> [input.json] --outdir <dir> --iter <n>` | Validate layout, output diagnostics JSON. `input.json` optional — auto-infers IR from HTML. Exit 0 = clean, 1 = defects |
+| `to-pptx.ts` | `npx tsx scripts/to-pptx.ts <slide.html> <output.pptx>` | Convert absolute HTML to PowerPoint |
+| `replay.ts` | `npx tsx scripts/replay.ts <rollout-dir> [output.html]` | Generate interactive debug viewer from rollout artifacts |
+| `pack.sh` | `bash scripts/pack.sh [output-path]` | Build and package tarball for container deployment |
+| `container-setup.sh` | `bash scripts/container-setup.sh` | Bootstrap PPTAgent in a container (npm, Chromium, fonts) |
+
+---
+
 ## Project Structure
 
 ```
@@ -437,6 +499,15 @@ src/
 │
 ├── extraction/
 │   └── dom-extractor.ts                  # Playwright -> DOMDocument
+│
+├── ir/
+│   └── infer-ir.ts                       # Auto-infer IR from rendered HTML
+│
+├── flatten/
+│   └── flatten-html.ts                   # Flexbox -> absolute positioning
+│
+├── pptx/
+│   └── html-to-pptx.ts                  # HTML -> PowerPoint via pptxgenjs
 │
 ├── diagnostics/
 │   ├── engine.ts                         # Orchestrator (runs all detectors)
@@ -460,15 +531,34 @@ src/
 │
 ├── debug/
 │   ├── visual-debug.ts                   # Interactive multi-iteration HTML viewer
+│   ├── synthetic-ir.ts                   # Build IR from DOM + optional metadata
 │   └── overlay.ts                        # Live Playwright SVG overlay injection
 │
 └── utils/
     ├── geometry.ts                       # Rect operations (inflate, intersect, clamp, ...)
+    ├── browser.ts                        # launchBrowser() with CHROMIUM_PATH support
     └── fs-helpers.ts                     # File I/O for rollout directories
 
+scripts/                                  # CLI tools (flatten, check-slide, to-pptx, etc.)
 tests/                                    # Vitest tests mirroring src/ structure
-demo*.ts                                  # Runnable demo scripts
+SKILL.md                                  # Skill router (progressive disclosure)
+creating.md                               # Phase 1: flexbox HTML creation guide
+fixing.md                                 # Phase 2: defect fixing guide
 ```
+
+---
+
+## Skill Docs
+
+Three markdown files guide an LLM through slide creation, following a [progressive disclosure](https://github.com/anthropics/skills/tree/main/skills/pptx) pattern:
+
+| File | Purpose |
+|---|---|
+| `SKILL.md` | Router — workflow overview, constraints table, CLI commands. Entry point. |
+| `creating.md` | Phase 1 — plan layout in markdown, write flexbox HTML, flatten to absolute. |
+| `fixing.md` | Phase 2 — run diagnostics, read hints, fix CSS values, re-validate. |
+
+These are included in the deployment tarball. `container-setup.sh` copies `SKILL.md` to `/shared/pptagent-skill.md` where the framework prompt references it.
 
 ---
 
