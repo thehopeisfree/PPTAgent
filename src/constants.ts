@@ -54,6 +54,12 @@ export const TEXT_TYPES = new Set(["title", "text", "bullets"]);
 /** Edge proximity threshold — elements closer than this to the slide edge are flagged (px) */
 export const EDGE_MARGIN_PX = 24;
 
+/** Content underflow: container height > UNDERFLOW_RATIO × content height → defect */
+export const UNDERFLOW_RATIO = 2;
+
+/** Whitespace excess: element coverage < this fraction of slide area → warning */
+export const WHITESPACE_COVERAGE_MIN = 0.3;
+
 /** Tolerance for image aspect ratio deviation (1%) */
 export const IMAGE_ASPECT_RATIO_EPS = 0.01;
 

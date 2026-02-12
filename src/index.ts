@@ -17,6 +17,8 @@ export {
   IMAGE_ASPECT_RATIO_EPS,
   DEFAULT_Z_INDEX,
   TOPOLOGY_SEVERITY,
+  UNDERFLOW_RATIO,
+  WHITESPACE_COVERAGE_MIN,
 } from "./constants.js";
 
 // Schema types
@@ -44,10 +46,14 @@ export type {
   DiagSummary,
   DiagDocument,
   ContentOverflowDetails,
+  ContentUnderflowDetails,
   OutOfBoundsDetails,
   OverlapDetails,
   FontTooSmallDetails,
   LayoutTopologyDetails,
+  EdgeProximityDetails,
+  OcclusionWarning,
+  WhitespaceExcessWarning,
 } from "./schema/diag.js";
 
 export type { PatchEdit, PatchDocument } from "./schema/patch.js";
@@ -75,6 +81,9 @@ export { detectContentOverflow } from "./diagnostics/detectors/content-overflow.
 export { detectOutOfBounds } from "./diagnostics/detectors/out-of-bounds.js";
 export { detectOverlaps } from "./diagnostics/detectors/overlap.js";
 export { detectFontTooSmall } from "./diagnostics/detectors/font-too-small.js";
+export { detectEdgeProximity } from "./diagnostics/detectors/edge-proximity.js";
+export { detectContentUnderflow } from "./diagnostics/detectors/content-underflow.js";
+export { detectWhitespaceExcess } from "./diagnostics/detectors/whitespace-excess.js";
 export { totalSeverity } from "./diagnostics/severity.js";
 export { validateHint, annotateBudgetConstraints } from "./diagnostics/hints/hint-calculator.js";
 export { analyzeConflicts } from "./diagnostics/hints/conflict-solver.js";

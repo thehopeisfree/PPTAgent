@@ -483,4 +483,76 @@ describe("Diagnostics Engine", () => {
     expect(comp.edges[0]!.separations).toHaveLength(4);
     expect(comp.envelopes).toHaveLength(2);
   });
+
+  it("detects content_underflow for text element with large container", () => {
+    const ir: IRDocument = {
+      slide: { w: 1280, h: 720 },
+      elements: [
+        {
+          eid: "e1",
+          type: "text",
+          priority: 60,
+          content: "Short text",
+          layout: { x: 48, y: 32, w: 400, h: 300, zIndex: 10 },
+          style: { fontSize: 20, lineHeight: 1.5 },
+        },
+      ],
+    };
+    const dom: DOMDocument = {
+      slide: { w: 1280, h: 720 },
+      safe_padding: 8,
+      elements: [
+        {
+          eid: "e1",
+          bbox: { x: 48, y: 32, w: 400, h: 300 },
+          safeBox: { x: 40, y: 24, w: 416, h: 316 },
+          contentBox: { x: 48, y: 34, w: 300, h: 80 },
+          zIndex: 10,
+          computed: { fontSize: 20, lineHeight: 1.5 },
+        },
+      ],
+    };
+
+    const diag = diagnose(dom, ir);
+    const underflow = diag.defects.filter((d) => d.type === "content_underflow");
+    expect(underflow).toHaveLength(1);
+    expect(underflow[0]!.severity).toBe(220); // 300 - 80
+    expect(underflow[0]!.hint).toBeDefined();
+    expect(underflow[0]!.hint!.action).toBe("shrink_container");
+  });
+
+  it("produces whitespace_excess warning for sparse slide", () => {
+    const ir: IRDocument = {
+      slide: { w: 1280, h: 720 },
+      elements: [
+        {
+          eid: "e1",
+          type: "title",
+          priority: 100,
+          content: "Hello",
+          layout: { x: 48, y: 32, w: 200, h: 50, zIndex: 10 },
+          style: { fontSize: 44, lineHeight: 1.2 },
+        },
+      ],
+    };
+    const dom: DOMDocument = {
+      slide: { w: 1280, h: 720 },
+      safe_padding: 8,
+      elements: [
+        {
+          eid: "e1",
+          bbox: { x: 48, y: 32, w: 200, h: 50 },
+          safeBox: { x: 40, y: 24, w: 216, h: 66 },
+          contentBox: { x: 48, y: 34, w: 150, h: 40 },
+          zIndex: 10,
+          computed: { fontSize: 44, lineHeight: 1.2 },
+        },
+      ],
+    };
+
+    const diag = diagnose(dom, ir);
+    const wsWarnings = diag.warnings.filter((w) => w.type === "whitespace_excess");
+    expect(wsWarnings).toHaveLength(1);
+    expect(diag.summary.warning_count).toBeGreaterThanOrEqual(1);
+  });
 });

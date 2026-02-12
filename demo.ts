@@ -142,8 +142,12 @@ async function main() {
   if (diag.warnings.length > 0) {
     console.log("\n--- WARNINGS ---");
     for (const w of diag.warnings) {
-      console.log(`\n  [${w.type}] ${w.owner_eid} ↔ ${w.other_eid}`);
-      console.log(`    details: ${JSON.stringify(w.details)}`);
+      if (w.type === "occlusion_suspected") {
+        console.log(`\n  [${w.type}] ${w.owner_eid} ↔ ${w.other_eid}`);
+        console.log(`    details: ${JSON.stringify(w.details)}`);
+      } else {
+        console.log(`\n  [${w.type}] coverage=${w.details.coverage_pct}% (threshold=${w.details.threshold_pct}%)`);
+      }
     }
   }
 

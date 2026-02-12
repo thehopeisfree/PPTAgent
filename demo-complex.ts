@@ -189,7 +189,11 @@ function printDiag(label: string, diag: ReturnType<typeof diagnose>) {
   if (diag.warnings.length > 0) {
     console.log("\n  WARNINGS:");
     for (const w of diag.warnings) {
-      console.log(`    [${w.type}] ${w.owner_eid} ↔ ${w.other_eid}  (top: ${w.details.top_eid}, area: ${w.details.overlap_area_px}px²)`);
+      if (w.type === "occlusion_suspected") {
+        console.log(`    [${w.type}] ${w.owner_eid} ↔ ${w.other_eid}  (top: ${w.details.top_eid}, area: ${w.details.overlap_area_px}px²)`);
+      } else {
+        console.log(`    [${w.type}] coverage=${w.details.coverage_pct}% (threshold=${w.details.threshold_pct}%)`);
+      }
     }
   }
 

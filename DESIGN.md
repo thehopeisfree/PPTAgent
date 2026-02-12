@@ -42,6 +42,8 @@ LLM ──JSON Patch──→ IR ──HTML──→ Playwright Render
 | `TEXT_OVERLAP_SEVERITY_MULT` | 2 | Severity multiplier when overlap involves text elements  |
 | `TOPOLOGY_SEVERITY`  | 5000    | Fixed severity for layout topology violations (structural) |
 | `EDGE_MARGIN_PX`     | 24      | Min distance from element edge to slide boundary (px)      |
+| `UNDERFLOW_RATIO`    | 2       | Container height > ratio × content height → underflow defect |
+| `WHITESPACE_COVERAGE_MIN` | 0.3 | Element coverage < 30% of slide area → whitespace warning  |
 
 ### Coordinate System
 
@@ -295,6 +297,7 @@ The diagnostics engine detects defects and generates **math hints** so the LLM d
 |--------------------|----------------------------------------------------------------------------|----------------------------------|--------------------------------------------|
 | `layout_topology`  | Title element center-y > body (bullets/text) element center-y              | `rule`, `title_eid`, `body_eid`, `title_cy`, `body_cy` | `move_to_top` with `suggested_y`  |
 | `content_overflow` | `contentBox.h > bbox.h` OR `contentBox.w > bbox.w`                         | `overflow_x_px`, `overflow_y_px` | `suggested_h` / `suggested_w` (+ buffer)   |
+| `content_underflow` | `bbox.h > contentBox.h × UNDERFLOW_RATIO`, text types only                 | `underflow_y_px`, `ratio`        | `shrink_container` with `suggested_h`      |
 | `out_of_bounds`    | bbox exceeds slide bounds beyond `OOB_EPS_PX`                             | `edge`, `by_px`                  | `suggested_x/y` and/or `suggested_w/h`     |
 | `edge_proximity`   | bbox edge within `EDGE_MARGIN_PX` of slide boundary (but not OOB), non-decoration | `edge`, `distance_px`, `threshold_px` | `nudge_from_edge` with `suggested_x/y`   |
 | `overlap`          | safeBox intersection area ≥ `MIN_OVERLAP_AREA_PX`, same zIndex, neither is `decoration` | `other_eid`, `overlap_area_px`   | `suggested_move` (direction + target value) |
@@ -307,6 +310,7 @@ Warnings are informational signals. They appear in `diag_k.json` but do **not** 
 | Warning                | Trigger                                                                                      | Details                             |
 |------------------------|----------------------------------------------------------------------------------------------|-------------------------------------|
 | `occlusion_suspected`  | safeBox intersection area ≥ `MIN_OVERLAP_AREA_PX`, **different** zIndex, neither is `decoration` | `other_eid`, `overlap_area_px`, `top_eid` (higher zIndex element) |
+| `whitespace_excess`    | Non-decoration element coverage < `WHITESPACE_COVERAGE_MIN` of slide area                        | `coverage_pct`, `threshold_pct`, `element_area_px`, `slide_area_px` |
 
 ### 5.3 Overlap Rules
 
@@ -375,9 +379,10 @@ When multiple defect types coexist, resolve in this order:
 1. **`layout_topology`** — restore structural reading order first (e.g., title above body).
 2. **`font_too_small`** — restore minimum readability.
 3. **`content_overflow`** — fix via increase_h / reduce fontSize (within budget) / line-clamp.
-4. **`out_of_bounds`** — fix via move_in / shrink, clamp to safe zone.
-5. **`edge_proximity`** — nudge element inward so edge is at `EDGE_MARGIN_PX` from boundary.
-6. **`overlap`** — fix via move `owner_eid` / resize / shrink font on lower-priority.
+4. **`content_underflow`** — shrink oversized containers to free space for other elements.
+5. **`out_of_bounds`** — fix via move_in / shrink, clamp to safe zone.
+6. **`edge_proximity`** — nudge element inward so edge is at `EDGE_MARGIN_PX` from boundary.
+7. **`overlap`** — fix via move `owner_eid` / resize / shrink font on lower-priority.
 
 Rationale: Topology fixes restore semantic structure; font and overflow fixes change element sizes, which can resolve or shift overlaps. Fixing overlap first risks wasted work.
 
@@ -388,6 +393,7 @@ Each defect contributes a raw severity value to `total_severity`:
 | Defect Type        | Severity Contribution                      |
 |--------------------|--------------------------------------------|
 | `content_overflow` | `overflow_x_px + overflow_y_px`            |
+| `content_underflow` | `underflow_y_px` (bbox.h − contentBox.h)  |
 | `out_of_bounds`    | `by_px`                                    |
 | `edge_proximity`   | `EDGE_MARGIN_PX - distance_px`             |
 | `overlap`          | `overlap_area_px` × multiplier (see below) |

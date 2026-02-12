@@ -45,6 +45,12 @@ export interface EdgeProximityDetails {
   threshold_px: number;
 }
 
+/** Content underflow defect details */
+export interface ContentUnderflowDetails {
+  underflow_y_px: number;
+  ratio: number; // bbox.h / contentBox.h
+}
+
 /** Layout topology violation details */
 export interface LayoutTopologyDetails {
   rule: string;
@@ -60,11 +66,13 @@ export type DefectDetails =
   | OverlapDetails
   | FontTooSmallDetails
   | LayoutTopologyDetails
-  | EdgeProximityDetails;
+  | EdgeProximityDetails
+  | ContentUnderflowDetails;
 
 export type DefectType =
   | "layout_topology"
   | "content_overflow"
+  | "content_underflow"
   | "out_of_bounds"
   | "overlap"
   | "font_too_small"
@@ -82,11 +90,11 @@ export interface Defect {
 }
 
 /** Warning type */
-export type WarningType = "occlusion_suspected";
+export type WarningType = "occlusion_suspected" | "whitespace_excess";
 
-/** A layout warning (informational, does not count as a defect) */
-export interface Warning {
-  type: WarningType;
+/** Occlusion warning: cross-zIndex overlap between non-decoration elements */
+export interface OcclusionWarning {
+  type: "occlusion_suspected";
   owner_eid: string;
   other_eid: string;
   details: {
@@ -94,6 +102,20 @@ export interface Warning {
     top_eid: string;
   };
 }
+
+/** Whitespace excess warning: slide element coverage below threshold */
+export interface WhitespaceExcessWarning {
+  type: "whitespace_excess";
+  details: {
+    coverage_pct: number; // 0–100
+    threshold_pct: number; // 30
+    element_area_px: number;
+    slide_area_px: number;
+  };
+}
+
+/** A layout warning (informational, does not count as a defect) */
+export type Warning = OcclusionWarning | WhitespaceExcessWarning;
 
 /** One of 4 ways to fix an overlap (move owner in a direction) */
 export interface SeparationOption {

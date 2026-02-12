@@ -7,6 +7,8 @@ import { detectOutOfBounds } from "./detectors/out-of-bounds.js";
 import { detectOverlaps } from "./detectors/overlap.js";
 import { detectFontTooSmall } from "./detectors/font-too-small.js";
 import { detectEdgeProximity } from "./detectors/edge-proximity.js";
+import { detectContentUnderflow } from "./detectors/content-underflow.js";
+import { detectWhitespaceExcess } from "./detectors/whitespace-excess.js";
 import { analyzeConflicts } from "./hints/conflict-solver.js";
 import { validateHint, annotateBudgetConstraints } from "./hints/hint-calculator.js";
 import { totalSeverity } from "./severity.js";
@@ -44,6 +46,14 @@ export function diagnose(dom: DOMDocument, ir: IRDocument): DiagDocument {
     if (defect) defects.push(defect);
   }
 
+  // 3.5 content_underflow
+  for (const domEl of dom.elements) {
+    const irEl = irMap.get(domEl.eid);
+    if (!irEl) continue;
+    const defect = detectContentUnderflow(domEl, irEl);
+    if (defect) defects.push(defect);
+  }
+
   // 4. out_of_bounds
   for (const domEl of dom.elements) {
     const oobDefects = detectOutOfBounds(domEl);
@@ -63,6 +73,10 @@ export function diagnose(dom: DOMDocument, ir: IRDocument): DiagDocument {
   defects.push(...overlapDefects);
   warnings.push(...occlusionWarnings);
 
+  // 5.5 whitespace_excess warning
+  const wsWarnings = detectWhitespaceExcess(dom.elements, ir.elements);
+  warnings.push(...wsWarnings);
+
   // Validate all hints
   for (const d of defects) {
     if (d.hint) {
@@ -79,10 +93,12 @@ export function diagnose(dom: DOMDocument, ir: IRDocument): DiagDocument {
   // Compute severity
   const severity = totalSeverity(defects);
 
-  // Compute warning severity (sum of overlap areas from warnings)
+  // Compute warning severity (sum of overlap areas from occlusion warnings only)
   let warningSeverity = 0;
   for (const w of warnings) {
-    warningSeverity += w.details.overlap_area_px;
+    if (w.type === "occlusion_suspected") {
+      warningSeverity += w.details.overlap_area_px;
+    }
   }
 
   const summary: DiagDocument["summary"] = {
