@@ -24,12 +24,17 @@
 
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { parseIR } from "../src/schema/ir.js";
-import { launchBrowser } from "../src/utils/browser.js";
-import { extractDOM, screenshotSlide } from "../src/extraction/dom-extractor.js";
-import { diagnose } from "../src/diagnostics/engine.js";
-import { inferIR } from "../src/ir/infer-ir.js";
-import { rolloutPaths, writeJSON, writeFile } from "../src/utils/fs-helpers.js";
+import {
+  parseIR,
+  launchBrowser,
+  extractDOM,
+  screenshotSlide,
+  diagnose,
+  inferIR,
+  rolloutPaths,
+  writeJSON,
+  writeFile,
+} from "../dist/index.js";
 
 // ── Parse args ──
 const args = process.argv.slice(2);

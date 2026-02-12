@@ -10,8 +10,7 @@
  */
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { htmlToPptxFile } from "../src/pptx/html-to-pptx.js";
-import { launchBrowser } from "../src/utils/browser.js";
+import { htmlToPptxFile, launchBrowser } from "../dist/index.js";
 
 async function main() {
   const args = process.argv.slice(2);

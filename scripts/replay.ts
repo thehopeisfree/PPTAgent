@@ -13,13 +13,18 @@
 
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { readJSON, writeFile } from "../src/utils/fs-helpers.js";
-import { generateDebugHTML } from "../src/debug/visual-debug.js";
-import type { DebugSnapshot } from "../src/debug/visual-debug.js";
-import { syntheticIRFromDOM } from "../src/debug/synthetic-ir.js";
-import type { InputElement } from "../src/debug/synthetic-ir.js";
-import type { DOMDocument } from "../src/schema/dom.js";
-import type { DiagDocument } from "../src/schema/diag.js";
+import {
+  readJSON,
+  writeFile,
+  generateDebugHTML,
+  syntheticIRFromDOM,
+} from "../dist/index.js";
+import type {
+  DebugSnapshot,
+  InputElement,
+  DOMDocument,
+  DiagDocument,
+} from "../dist/index.js";
 
 // ── Parse args ──
 const args = process.argv.slice(2);

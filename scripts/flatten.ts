@@ -13,9 +13,7 @@
  */
 import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { flattenHTML } from "../src/flatten/flatten-html.js";
-import { launchBrowser } from "../src/utils/browser.js";
-import { rolloutPaths } from "../src/utils/fs-helpers.js";
+import { flattenHTML, launchBrowser, rolloutPaths } from "../dist/index.js";
 
 const args = process.argv.slice(2);
 const positional: string[] = [];

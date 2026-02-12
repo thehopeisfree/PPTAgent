@@ -41,7 +41,12 @@ tar czf "$OUTPUT" \
   SKILL.md \
   creating.md \
   fixing.md \
-  scripts/container-setup.sh
+  scripts/container-setup.sh \
+  scripts/check-slide.ts \
+  scripts/flatten.ts \
+  scripts/to-pptx.ts \
+  scripts/verify-setup.ts \
+  scripts/replay.ts
 
 SIZE=$(du -h "$OUTPUT" | cut -f1)
 echo ""

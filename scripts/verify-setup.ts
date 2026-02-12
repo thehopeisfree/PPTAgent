@@ -7,14 +7,16 @@
  * Exit code 0 = all good, non-zero = setup broken.
  */
 
-import { parseIR } from "../src/schema/ir.js";
-import { launchBrowser } from "../src/utils/browser.js";
-import { parsePatch } from "../src/schema/patch.js";
-import { renderHTML } from "../src/renderer/html-renderer.js";
-import { extractDOM } from "../src/extraction/dom-extractor.js";
-import { diagnose } from "../src/diagnostics/engine.js";
-import { applyPatch } from "../src/patch/apply-patch.js";
-import { createSession } from "../src/driver/loop-driver.js";
+import {
+  parseIR,
+  launchBrowser,
+  parsePatch,
+  renderHTML,
+  extractDOM,
+  diagnose,
+  applyPatch,
+  createSession,
+} from "../dist/index.js";
 
 async function verify() {
   const checks: string[] = [];
