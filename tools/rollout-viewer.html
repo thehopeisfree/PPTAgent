@@ -4,73 +4,232 @@
 <meta charset="utf-8" />
 <title>PPTAgent Rollout Viewer</title>
 <style>
-/* ── Loader styles ── */
+/* ── Global reset ── */
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; color: #1e1e2e; }
 
-#loader {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 100vh;
-  gap: 24px;
-}
-#loader h1 { font-size: 28px; color: #7c3aed; }
-#loader p { font-size: 14px; color: #6b7280; }
+#file-input { display: none; }
+@keyframes spin { to { transform: rotate(360deg); } }
 
-#drop-zone {
-  width: 480px;
-  height: 200px;
-  border: 2px dashed #cbd5e1;
-  border-radius: 12px;
+/* ── Layout ── */
+#layout { display: flex; height: 100vh; }
+
+/* ── Sidebar ── */
+#sidebar {
+  width: 240px;
+  min-width: 240px;
+  background: #f8f9fb;
+  border-right: 1px solid #e2e8f0;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
+}
+#sidebar-header {
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #e2e8f0;
+}
+#sidebar-header span { font-size: 16px; font-weight: 700; color: #7c3aed; }
+#btn-add {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  color: #7c3aed;
+  font-size: 20px;
+  cursor: pointer;
+  display: flex;
   align-items: center;
   justify-content: center;
-  gap: 12px;
+  line-height: 1;
+}
+#btn-add:hover { background: #f1f5f9; }
+
+#sidebar-drop {
+  margin: 8px 12px;
+  padding: 16px 8px;
+  border: 2px dashed #cbd5e1;
+  border-radius: 8px;
+  text-align: center;
+  font-size: 13px;
+  color: #94a3b8;
   cursor: pointer;
   transition: border-color 0.2s, background 0.2s;
 }
-#drop-zone:hover, #drop-zone.dragover {
+#sidebar-drop:hover, #sidebar-drop.dragover {
   border-color: #7c3aed;
   background: rgba(124,58,237,0.04);
 }
-#drop-zone .icon { font-size: 48px; color: #94a3b8; }
-#drop-zone .label { font-size: 16px; color: #475569; }
-#drop-zone .sublabel { font-size: 12px; color: #94a3b8; }
-#file-input { display: none; }
 
-#progress {
-  display: none;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
+#rollout-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 8px;
 }
-#progress .spinner {
-  width: 32px;
-  height: 32px;
-  border: 3px solid #e2e8f0;
-  border-top: 3px solid #7c3aed;
+.rollout-card {
+  padding: 8px 10px;
+  margin-bottom: 4px;
+  border-radius: 6px;
+  border: 1.5px solid transparent;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  position: relative;
+}
+.rollout-card:hover { background: #eef2ff; }
+.rollout-card.active { border-color: #7c3aed; background: #f5f3ff; }
+.rollout-card-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1e293b;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding-right: 20px;
+}
+.rollout-card-info {
+  font-size: 12px;
+  color: #64748b;
+  margin-top: 2px;
+  line-height: 1.5;
+}
+.rollout-card-delete {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 20px;
+  height: 20px;
+  border: none;
+  background: transparent;
+  color: #94a3b8;
+  font-size: 15px;
+  cursor: pointer;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+.rollout-card-delete:hover { background: #fee2e2; color: #dc2626; }
+.rollout-card-loading { opacity: 0.5; pointer-events: none; }
+.rollout-card-loading .rollout-card-info::after {
+  content: '';
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 2px solid #e2e8f0;
+  border-top: 2px solid #7c3aed;
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
+  margin-left: 4px;
+  vertical-align: middle;
 }
-@keyframes spin { to { transform: rotate(360deg); } }
-#progress-text { font-size: 13px; color: #475569; }
 
-#error-msg {
+.rollout-card-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: #7c3aed;
+  cursor: pointer;
+  margin-top: 4px;
+}
+.rollout-card-toggle input { margin: 0; cursor: pointer; }
+.rollout-card-groups {
+  margin-top: 4px;
+  padding: 4px 0 0;
+  border-top: 1px dashed #e2e8f0;
+  font-size: 11px;
+  color: #475569;
+  line-height: 1.7;
+}
+.group-iter { color: #94a3b8; font-size: 11px; }
+.group-set {
+  display: inline;
+  background: #fef3c7;
+  color: #92400e;
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 11px;
+  margin: 0 2px;
+}
+
+/* ── Viewer area ── */
+#viewer-area { flex: 1; display: flex; flex-direction: column; overflow: hidden; position: relative; }
+
+#empty-state {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  color: #94a3b8;
+  cursor: pointer;
+}
+#empty-state .icon { font-size: 56px; }
+#empty-state .label { font-size: 18px; color: #475569; }
+#empty-state .sublabel { font-size: 14px; }
+#empty-state.dragover { background: rgba(124,58,237,0.04); }
+
+/* ── Conflict bar ── */
+#conflict-bar {
+  background: #fff;
+  border-top: 1px solid #e2e8f0;
+  padding: 8px 16px;
   display: none;
-  color: #dc2626;
-  font-size: 14px;
-  max-width: 480px;
-  text-align: center;
-  padding: 12px;
-  background: rgba(220,38,38,0.06);
-  border-radius: 8px;
+  gap: 12px;
+  overflow: auto;
+  flex-shrink: 0;
+  max-height: 160px;
+}
+#conflict-bar.visible { display: flex; }
+.cb-group {
+  flex-shrink: 0;
+  border-left: 3px solid #f59e0b;
+  padding: 6px 12px;
+  background: #fffbeb;
+  border-radius: 0 6px 6px 0;
+  cursor: pointer;
+  transition: background 0.15s;
+  min-width: 180px;
+}
+.cb-group:hover { background: #fef3c7; }
+.cb-group.active { background: #fde68a; border-left-color: #d97706; }
+.cb-group-header {
+  font-size: 12px;
+  font-weight: 700;
+  color: #92400e;
+  margin-bottom: 4px;
+}
+.cb-edge {
+  font-size: 11px;
+  color: #475569;
+  font-family: 'Cascadia Code', 'Fira Code', monospace;
+  line-height: 1.6;
+}
+.cb-env {
+  font-size: 10px;
+  color: #64748b;
+  font-family: 'Cascadia Code', 'Fira Code', monospace;
+  margin-top: 2px;
+}
+.group-highlight-rect {
+  fill: rgba(245, 158, 11, 0.35);
+  stroke: #f59e0b;
+  stroke-width: 4;
+  pointer-events: none;
+  animation: eid-pulse 1s ease-in-out infinite alternate;
+}
+@keyframes eid-pulse {
+  from { fill: rgba(245, 158, 11, 0.25); }
+  to   { fill: rgba(245, 158, 11, 0.45); }
 }
 
 /* ── Viewer styles ── */
-#app { display: none; flex-direction: column; height: 100vh; }
+#app { display: none; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
 
 #toolbar {
   background: #ffffff;
@@ -127,6 +286,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
   display: flex;
   flex: 1;
   overflow: hidden;
+  min-height: 0;
 }
 
 #slide-area {
@@ -328,20 +488,12 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 }
 .anim-rect { position: absolute; }
 
-/* Hover-to-highlight: conflict elements on slide */
-.conflict-elem { opacity: 0.2; transition: opacity 0.15s ease; }
-.conflict-elem.active, .conflict-elem:hover { opacity: 1; }
-
-/* Hover-to-highlight: conflict panel rows */
-.conflict-panel-row { opacity: 0.6; transition: opacity 0.15s ease; }
-.conflict-panel-row.active, .conflict-panel-row:hover { opacity: 1; }
-
 /* Hover-to-highlight: defect labels */
 .defect-group { opacity: 0.25; transition: opacity 0.15s ease; }
 .defect-group.active, .defect-group:hover { opacity: 1; }
 
 /* Ensure all SVG children are hoverable */
-.conflict-elem *, .conflict-panel-row *, .defect-group * { pointer-events: all; }
+.defect-group * { pointer-events: all; }
 
 /* Animated marching-ants trace for movement arrows */
 @keyframes marchingAnts { to { stroke-dashoffset: -16; } }
@@ -350,25 +502,26 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 </head>
 <body>
 
-<!-- ── Loader UI ── -->
-<div id="loader">
-  <h1>PPTAgent Rollout Viewer</h1>
-  <div id="drop-zone">
-    <div class="icon">&#x1F4E6;</div>
-    <div class="label">Drop pptagent_rollout.tar.gz here</div>
-    <div class="sublabel">or click to browse</div>
+<!-- ── Layout ── -->
+<div id="layout">
+  <div id="sidebar">
+    <div id="sidebar-header">
+      <span>Rollouts</span>
+      <button id="btn-add" title="Add rollout (+)">+</button>
+    </div>
+    <div id="sidebar-drop">Drop .tar.gz here<br>or click +</div>
+    <div id="rollout-list"></div>
   </div>
-  <input type="file" id="file-input" accept=".tar.gz,.tgz" />
-  <div id="progress">
-    <div class="spinner"></div>
-    <div id="progress-text">Loading...</div>
+  <div id="viewer-area">
+    <div id="empty-state">
+      <div class="icon">&#x1F4E6;</div>
+      <div class="label">Drop a .tar.gz or click + to load a rollout</div>
+      <div class="sublabel">Self-contained rollout viewer &mdash; no server needed</div>
+    </div>
+    <div id="app"></div>
   </div>
-  <div id="error-msg"></div>
-  <p>Self-contained rollout viewer &mdash; no server needed</p>
 </div>
-
-<!-- ── Viewer UI (built dynamically) ── -->
-<div id="app"></div>
+<input type="file" id="file-input" accept=".tar.gz,.tgz" multiple />
 
 <script>
 // ═══════════════════════════════════════════════════════════════
@@ -1019,148 +1172,7 @@ function buildOverlaySVG(ir, dom, diag, slideW, slideH) {
     }));
   }
 
-  // Conflict graph
-  var conflictGraph = (diag.summary && diag.summary.conflict_graph) || [];
-  var defs = '<defs>' +
-    '<marker id="overflow-arrow" markerWidth="6" markerHeight="5" refX="6" refY="2.5" orient="auto">' +
-    '<polygon points="0 0, 6 2.5, 0 5" fill="#ef4444" /></marker>' +
-    '</defs>';
-
-  if (conflictGraph.length > 0) {
-    var nextPanelBottom = slideH;
-
-    for (var ci = 0; ci < conflictGraph.length; ci++) {
-      var comp = conflictGraph[ci];
-      var accentColor = '#f59e0b';
-
-      var rowH = 22;
-      var headerH = 28;
-      var padX = 14;
-      var padY = 10;
-      var panelX = 16;
-
-      var edgeRows = comp.edges.map(function(e) {
-        var best = e.separations[0];
-        var alts = e.separations.slice(1).map(function(s) { return s.direction.replace('move_', '') + ' ' + s.cost_px + 'px'; }).join(', ');
-        return e.owner_eid + ' \u2192 ' + e.other_eid + ': ' + (best ? best.direction.replace('move_', '') + ' ' + best.cost_px + 'px' : '?') + (alts ? ' (or: ' + alts + ')' : '');
-      });
-      var envRow = 'Space: ' + comp.envelopes.map(function(env) {
-        return env.eid + ' \u2191' + env.free_top + ' \u2193' + env.free_bottom + ' \u2190' + env.free_left + ' \u2192' + env.free_right;
-      }).join(' | ');
-
-      var allRows = edgeRows.concat([envRow]);
-      var maxTextLen = 0;
-      for (var ri = 0; ri < allRows.length; ri++) maxTextLen = Math.max(maxTextLen, allRows[ri].length);
-      var panelW = Math.max(280, maxTextLen * 6.5 + padX * 2 + 12);
-      var panelH = headerH + allRows.length * rowH + padY * 2;
-      var panelY = nextPanelBottom - panelH - 16;
-      nextPanelBottom = panelY;
-
-      parts.push(
-        '<g data-layer="conflict">' +
-        '<rect x="' + panelX + '" y="' + panelY + '" width="' + panelW + '" height="' + panelH + '" rx="8"' +
-        ' fill="rgba(255,255,255,0.95)" stroke="' + accentColor + '" stroke-width="1.5" />' +
-        '</g>'
-      );
-
-      parts.push(
-        '<g data-layer="conflict">' +
-        '<text x="' + (panelX + padX) + '" y="' + (panelY + headerH - 6) + '" fill="' + accentColor + '"' +
-        ' font-size="13" font-weight="bold" font-family="system-ui, sans-serif">' +
-        'Conflict group' + (conflictGraph.length > 1 ? ' #' + (ci + 1) : '') + ' (' + comp.eids.length + ' elements, ' + comp.edges.length + ' edges)</text>' +
-        '<line x1="' + (panelX + padX) + '" y1="' + (panelY + headerH) + '"' +
-        ' x2="' + (panelX + panelW - padX) + '" y2="' + (panelY + headerH) + '"' +
-        ' stroke="' + accentColor + '" stroke-width="0.5" opacity="0.4" />' +
-        '</g>'
-      );
-
-      for (var ri = 0; ri < edgeRows.length; ri++) {
-        var eid = comp.edges[ri].owner_eid;
-        var cy = panelY + headerH + padY + ri * rowH + 14;
-        parts.push(
-          '<g class="conflict-panel-row" data-conflict-eid="' + escapeHtml(eid) + '" data-layer="conflict">' +
-          '<rect x="' + (panelX + 4) + '" y="' + (cy - 12) + '" width="' + (panelW - 8) + '" height="' + rowH + '" fill="transparent" />' +
-          '<text x="' + (panelX + padX) + '" y="' + cy + '" fill="#334155" font-size="11"' +
-          ' font-family="\'Cascadia Code\', \'Fira Code\', monospace">' + escapeHtml(edgeRows[ri]) + '</text>' +
-          '</g>'
-        );
-      }
-
-      var envCy = panelY + headerH + padY + edgeRows.length * rowH + 14;
-      parts.push(
-        '<g data-layer="conflict">' +
-        '<text x="' + (panelX + padX) + '" y="' + envCy + '" fill="#64748b" font-size="10"' +
-        ' font-family="\'Cascadia Code\', \'Fira Code\', monospace">' + escapeHtml(envRow) + '</text>' +
-        '</g>'
-      );
-
-      for (var ei = 0; ei < comp.edges.length; ei++) {
-        var edge = comp.edges[ei];
-        var ownerDom = dom.elements.find(function(e) { return e.eid === edge.owner_eid; });
-        var otherDom = dom.elements.find(function(e) { return e.eid === edge.other_eid; });
-        if (!ownerDom || !otherDom) continue;
-
-        var oCX = ownerDom.bbox.x + ownerDom.bbox.w / 2;
-        var oCY = ownerDom.bbox.y + ownerDom.bbox.h / 2;
-        var tCX = otherDom.bbox.x + otherDom.bbox.w / 2;
-        var tCY = otherDom.bbox.y + otherDom.bbox.h / 2;
-
-        parts.push(
-          '<g class="conflict-elem" data-conflict-eid="' + escapeHtml(edge.owner_eid) + '" data-layer="conflict">' +
-          '<line x1="' + oCX + '" y1="' + oCY + '" x2="' + tCX + '" y2="' + tCY + '"' +
-          ' stroke="#f59e0b" stroke-width="2" stroke-dasharray="6,4" opacity="0.7" />' +
-          '</g>'
-        );
-      }
-
-      for (var ei = 0; ei < comp.envelopes.length; ei++) {
-        var env = comp.envelopes[ei];
-        var domEl = dom.elements.find(function(e) { return e.eid === env.eid; });
-        if (!domEl) continue;
-        var b = domEl.bbox;
-        var arrowLen = 12;
-
-        parts.push('<g class="conflict-elem" data-conflict-eid="' + escapeHtml(env.eid) + '" data-layer="conflict">');
-
-        if (env.free_top > 0) {
-          parts.push(
-            '<line x1="' + (b.x + b.w / 2) + '" y1="' + b.y + '" x2="' + (b.x + b.w / 2) + '" y2="' + (b.y - Math.min(arrowLen, env.free_top)) + '"' +
-            ' stroke="#22c55e" stroke-width="1.5" />' +
-            '<polygon points="' + (b.x + b.w / 2 - 3) + ',' + (b.y - Math.min(arrowLen, env.free_top) + 4) + ' ' + (b.x + b.w / 2 + 3) + ',' + (b.y - Math.min(arrowLen, env.free_top) + 4) + ' ' + (b.x + b.w / 2) + ',' + (b.y - Math.min(arrowLen, env.free_top)) + '"' +
-            ' fill="#22c55e" />'
-          );
-        }
-        if (env.free_bottom > 0) {
-          parts.push(
-            '<line x1="' + (b.x + b.w / 2) + '" y1="' + (b.y + b.h) + '" x2="' + (b.x + b.w / 2) + '" y2="' + (b.y + b.h + Math.min(arrowLen, env.free_bottom)) + '"' +
-            ' stroke="#22c55e" stroke-width="1.5" />' +
-            '<polygon points="' + (b.x + b.w / 2 - 3) + ',' + (b.y + b.h + Math.min(arrowLen, env.free_bottom) - 4) + ' ' + (b.x + b.w / 2 + 3) + ',' + (b.y + b.h + Math.min(arrowLen, env.free_bottom) - 4) + ' ' + (b.x + b.w / 2) + ',' + (b.y + b.h + Math.min(arrowLen, env.free_bottom)) + '"' +
-            ' fill="#22c55e" />'
-          );
-        }
-        if (env.free_left > 0) {
-          parts.push(
-            '<line x1="' + b.x + '" y1="' + (b.y + b.h / 2) + '" x2="' + (b.x - Math.min(arrowLen, env.free_left)) + '" y2="' + (b.y + b.h / 2) + '"' +
-            ' stroke="#22c55e" stroke-width="1.5" />' +
-            '<polygon points="' + (b.x - Math.min(arrowLen, env.free_left) + 4) + ',' + (b.y + b.h / 2 - 3) + ' ' + (b.x - Math.min(arrowLen, env.free_left) + 4) + ',' + (b.y + b.h / 2 + 3) + ' ' + (b.x - Math.min(arrowLen, env.free_left)) + ',' + (b.y + b.h / 2) + '"' +
-            ' fill="#22c55e" />'
-          );
-        }
-        if (env.free_right > 0) {
-          parts.push(
-            '<line x1="' + (b.x + b.w) + '" y1="' + (b.y + b.h / 2) + '" x2="' + (b.x + b.w + Math.min(arrowLen, env.free_right)) + '" y2="' + (b.y + b.h / 2) + '"' +
-            ' stroke="#22c55e" stroke-width="1.5" />' +
-            '<polygon points="' + (b.x + b.w + Math.min(arrowLen, env.free_right) - 4) + ',' + (b.y + b.h / 2 - 3) + ' ' + (b.x + b.w + Math.min(arrowLen, env.free_right) - 4) + ',' + (b.y + b.h / 2 + 3) + ' ' + (b.x + b.w + Math.min(arrowLen, env.free_right)) + ',' + (b.y + b.h / 2) + '"' +
-            ' fill="#22c55e" />'
-          );
-        }
-
-        parts.push('</g>');
-      }
-    }
-  }
-
-  return defs + parts.join('\n            ');
+  return parts.join('\n            ');
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -1387,6 +1399,7 @@ function buildViewer(rollout) {
       overridesJSON: overridesJSON,
       elements: buildElementData(it.ir, it.dom, it.diag),
       summary: it.diag.summary,
+      dom: it.dom,
       fingerprint: null,
       tabooFingerprints: [],
     });
@@ -1436,7 +1449,6 @@ function buildViewer(rollout) {
   app.innerHTML =
     '<div id="toolbar">' +
       '<h1>PPTAgent Visual Debug</h1>' +
-      '<button id="btn-reset" onclick="resetViewer()" title="Load another file" style="background:#f1f5f9;border:1px solid #e2e8f0;color:#475569;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:12px;white-space:nowrap">&#x21bb; Reset</button>' +
       '<div id="tabs">' + tabsHTML + '</div>' +
       '<div id="toggles">' +
         '<label style="font-weight:bold;border-right:1px solid #e2e8f0;padding-right:8px;margin-right:4px"><input type="checkbox" checked id="toggle-invert" onchange="invertAll()"> all</label>' +
@@ -1447,7 +1459,6 @@ function buildViewer(rollout) {
         '<label><input type="checkbox" checked data-layer="oob" onchange="toggleLayer(\'oob\', this.checked)"> <span class="swatch" style="border:2px solid #ef4444"></span> out of bounds</label>' +
         '<label><input type="checkbox" checked data-layer="badge" onchange="toggleLayer(\'badge\', this.checked)"> <span class="swatch" style="background:#dc2626;color:#fff;font-size:9px;padding:0 3px">!</span> defect labels</label>' +
         '<label><input type="checkbox" checked data-layer="hint" onchange="toggleLayer(\'hint\', this.checked)"> <span class="swatch" style="border:2px dashed #22c55e"></span> hints</label>' +
-        '<label><input type="checkbox" checked data-layer="conflict" onchange="toggleLayer(\'conflict\', this.checked)"> <span class="swatch" style="border:2px solid #f59e0b"></span> conflicts</label>' +
         '<label><input type="checkbox" checked data-layer="diff" onchange="toggleLayer(\'diff\', this.checked)"> <span class="swatch" style="border:2px solid #a78bfa"></span> diff</label>' +
       '</div>' +
     '</div>' +
@@ -1486,7 +1497,10 @@ function buildViewer(rollout) {
         '</div>' +
         '<pre id="panel-content">' + escapeHtml(iterData[0].diagJSON) + '</pre>' +
       '</div>' +
-    '</div>';
+    '</div>' +
+    '<div id="conflict-bar"></div>';
+
+  updateConflictBar();
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -1536,6 +1550,7 @@ function switchIter(idx) {
   var pct = total > 0 ? (idx / total * 100) : 0;
   document.getElementById('timeline-progress').style.width = pct + '%';
   updatePanelContent();
+  updateConflictBar();
 }
 
 function invertAll() {
@@ -1650,19 +1665,181 @@ function setSpeed(ms) {
   playSpeed = ms;
 }
 
-function resetViewer() {
+// ── Conflict bar ──
+function updateConflictBar() {
+  window.activeGroupEl = null;
+  clearChain();
+  var bar = document.getElementById('conflict-bar');
+  if (!bar || !window.iterDataMeta) return;
+  var meta = window.iterDataMeta[currentIter];
+  var graph = (meta.summary && meta.summary.conflict_graph) || [];
+  if (graph.length === 0) {
+    bar.className = '';
+    bar.innerHTML = '';
+    return;
+  }
+  bar.className = 'visible';
+  var html = '';
+  for (var ci = 0; ci < graph.length; ci++) {
+    var comp = graph[ci];
+    var eidsAttr = comp.eids.map(escapeHtml).join(',');
+
+    var edgeLines = '';
+    for (var ei = 0; ei < comp.edges.length; ei++) {
+      var e = comp.edges[ei];
+      var best = e.separations[0];
+      var alts = e.separations.slice(1).map(function(s) {
+        return s.direction.replace('move_', '') + ' ' + s.cost_px + 'px';
+      }).join(', ');
+      var edgeText = escapeHtml(e.owner_eid + ' \u2192 ' + e.other_eid + ': ' +
+        (best ? best.direction.replace('move_', '') + ' ' + best.cost_px + 'px' : '?') +
+        (alts ? ' (or: ' + alts + ')' : ''));
+      edgeLines += '<div class="cb-edge">' + edgeText + '</div>';
+    }
+
+    var envParts = [];
+    for (var ei = 0; ei < comp.envelopes.length; ei++) {
+      var env = comp.envelopes[ei];
+      envParts.push(env.eid + ' \u2191' + env.free_top + ' \u2193' + env.free_bottom +
+        ' \u2190' + env.free_left + ' \u2192' + env.free_right);
+    }
+    var envText = envParts.length > 0 ? '<div class="cb-env">Space: ' + escapeHtml(envParts.join(' | ')) + '</div>' : '';
+
+    html += '<div class="cb-group" data-group-eids="' + eidsAttr + '">' +
+      '<div class="cb-group-header">Group ' + (ci + 1) + ' (' + comp.eids.length + ' elem, ' + comp.edges.length + ' edge' + (comp.edges.length !== 1 ? 's' : '') + ')</div>' +
+      edgeLines + envText + '</div>';
+  }
+  bar.innerHTML = html;
+}
+
+// ── Multi-rollout management ──
+window.rollouts = [];
+window.activeRolloutId = null;
+window.nextRolloutId = 1;
+
+function renderSidebar() {
+  var list = document.getElementById('rollout-list');
+  var html = '';
+  for (var i = 0; i < window.rollouts.length; i++) {
+    var r = window.rollouts[i];
+    var isActive = r.id === window.activeRolloutId;
+    var cls = 'rollout-card' + (isActive ? ' active' : '') + (r.loading ? ' rollout-card-loading' : '');
+    var info = '';
+    if (r.loading) {
+      info = 'Loading\u2026';
+    } else if (r.rollout) {
+      var iters = r.rollout.iterations;
+      var nIters = iters.length;
+      var firstD = iters[0].diag.summary.defect_count;
+      var lastD = iters[nIters - 1].diag.summary.defect_count;
+      info = nIters + ' iteration' + (nIters !== 1 ? 's' : '') + ' &middot; ' + firstD + 'D &rarr; ' + lastD + 'D';
+    }
+    html += '<div class="' + cls + '" data-rollout-id="' + r.id + '" onclick="selectRollout(' + r.id + ')">' +
+      '<div class="rollout-card-name">' + escapeHtml(r.name) + '</div>' +
+      '<div class="rollout-card-info">' + info + '</div>' +
+      '<button class="rollout-card-delete" onclick="event.stopPropagation();removeRollout(' + r.id + ')" title="Remove">&times;</button>';
+    if (!r.loading && r.rollout) {
+      html += '<label class="rollout-card-toggle" onclick="event.stopPropagation()">' +
+        '<input type="checkbox"' + (r.showGroups ? ' checked' : '') +
+        ' onchange="toggleGroups(' + r.id + ',this.checked)"> Conflict groups</label>';
+      if (r.showGroups) {
+        var iters = r.rollout.iterations;
+        html += '<div class="rollout-card-groups">';
+        for (var j = 0; j < iters.length; j++) {
+          var graph = (iters[j].diag.summary && iters[j].diag.summary.conflict_graph) || [];
+          html += '<div><span class="group-iter">Iter ' + iters[j].iter + ':</span> ';
+          if (graph.length === 0) {
+            html += '<span style="color:#22c55e">\u2713</span>';
+          } else {
+            for (var g = 0; g < graph.length; g++) {
+              html += '<span class="group-set">{' + graph[g].eids.map(escapeHtml).join(', ') + '}</span>';
+            }
+          }
+          html += '</div>';
+        }
+        html += '</div>';
+      }
+    }
+    html += '</div>';
+  }
+  list.innerHTML = html;
+}
+
+function toggleGroups(id, show) {
+  for (var i = 0; i < window.rollouts.length; i++) {
+    if (window.rollouts[i].id === id) {
+      window.rollouts[i].showGroups = show;
+      break;
+    }
+  }
+  renderSidebar();
+}
+
+function selectRollout(id) {
+  var entry = null;
+  for (var i = 0; i < window.rollouts.length; i++) {
+    if (window.rollouts[i].id === id) { entry = window.rollouts[i]; break; }
+  }
+  if (!entry || entry.loading || !entry.rollout) return;
+
   stopPlay();
-  window.iterDataMeta = null;
   currentIter = 0;
   animating = false;
-  document.getElementById('app').style.display = 'none';
-  document.getElementById('app').innerHTML = '';
-  var loader = document.getElementById('loader');
-  loader.style.display = 'flex';
-  document.getElementById('drop-zone').style.display = 'flex';
-  document.getElementById('progress').style.display = 'none';
-  document.getElementById('error-msg').style.display = 'none';
-  document.getElementById('file-input').value = '';
+  window.activeRolloutId = id;
+
+  document.getElementById('empty-state').style.display = 'none';
+  buildViewer(entry.rollout);
+  renderSidebar();
+}
+
+function removeRollout(id) {
+  stopPlay();
+  window.rollouts = window.rollouts.filter(function(r) { return r.id !== id; });
+
+  if (window.activeRolloutId === id) {
+    window.activeRolloutId = null;
+    window.iterDataMeta = null;
+    currentIter = 0;
+    animating = false;
+    document.getElementById('app').style.display = 'none';
+    document.getElementById('app').innerHTML = '';
+
+    // Select next available or show empty state
+    var nextEntry = null;
+    for (var i = 0; i < window.rollouts.length; i++) {
+      if (!window.rollouts[i].loading) { nextEntry = window.rollouts[i]; break; }
+    }
+    if (nextEntry) {
+      selectRollout(nextEntry.id);
+      return; // selectRollout calls renderSidebar
+    } else {
+      document.getElementById('empty-state').style.display = 'flex';
+    }
+  }
+  renderSidebar();
+}
+
+async function addRollout(file) {
+  var id = window.nextRolloutId++;
+  var entry = { id: id, name: file.name, rollout: null, loading: true };
+  window.rollouts.push(entry);
+  renderSidebar();
+
+  try {
+    var buffer = await file.arrayBuffer();
+    var tarBytes = await decompressGzip(buffer);
+    var fileMap = parseTar(tarBytes);
+    var rollout = loadRollout(fileMap);
+    entry.rollout = rollout;
+    entry.loading = false;
+    renderSidebar();
+    selectRollout(id);
+  } catch (err) {
+    window.rollouts = window.rollouts.filter(function(r) { return r.id !== id; });
+    renderSidebar();
+    console.error(err);
+    alert('Error loading ' + file.name + ': ' + (err.message || err));
+  }
 }
 
 function stepBack() {
@@ -1702,12 +1879,35 @@ document.addEventListener('keydown', function(e) {
 
 // ── Highlight helpers ──
 function highlightChain(eid) {
-  document.querySelectorAll('.conflict-elem, .conflict-panel-row').forEach(function(g) {
-    if (g.dataset.conflictEid === eid) g.classList.add('active');
+  // Add dynamic highlight rects to the SVG overlay
+  var activeSlide = document.querySelector('.iter-slide[data-iter="' + currentIter + '"]');
+  if (activeSlide) {
+    var svg = activeSlide.querySelector('.overlay-svg');
+    // Read bbox from DOM data
+    var meta = window.iterDataMeta[currentIter];
+    var domEl = meta.dom.elements.find(function(e) { return e.eid === eid; });
+    if (svg && domEl) {
+      var ns = 'http://www.w3.org/2000/svg';
+      var r = document.createElementNS(ns, 'rect');
+      r.setAttribute('x', domEl.bbox.x);
+      r.setAttribute('y', domEl.bbox.y);
+      r.setAttribute('width', domEl.bbox.w);
+      r.setAttribute('height', domEl.bbox.h);
+      r.setAttribute('class', 'group-highlight-rect');
+      svg.appendChild(r);
+    }
+  }
+  // Bottom bar groups containing this eid
+  document.querySelectorAll('.cb-group').forEach(function(g) {
+    var groupEids = (g.dataset.groupEids || '').split(',');
+    if (groupEids.indexOf(eid) >= 0) g.classList.add('active');
   });
 }
 function clearChain() {
-  document.querySelectorAll('.conflict-elem.active, .conflict-panel-row.active').forEach(function(g) {
+  document.querySelectorAll('.group-highlight-rect').forEach(function(el) {
+    el.remove();
+  });
+  document.querySelectorAll('.cb-group.active').forEach(function(g) {
     g.classList.remove('active');
   });
 }
@@ -1722,6 +1922,24 @@ function clearDefect() {
   });
 }
 
+// ── Conflict group click handler (toggle) ──
+window.activeGroupEl = null;
+document.addEventListener('click', function(e) {
+  if (!window.iterDataMeta) return;
+  var cbg = e.target.closest && e.target.closest('.cb-group');
+  if (!cbg) return;
+  clearChain();
+  if (window.activeGroupEl === cbg) {
+    // clicking the same card → deselect
+    window.activeGroupEl = null;
+    return;
+  }
+  // select this group
+  window.activeGroupEl = cbg;
+  var eids = (cbg.dataset.groupEids || '').split(',');
+  for (var i = 0; i < eids.length; i++) highlightChain(eids[i]);
+});
+
 // ── Unified hover handler ──
 var hoverRaf = null;
 document.addEventListener('mouseover', function(e) {
@@ -1729,12 +1947,11 @@ document.addEventListener('mouseover', function(e) {
   if (hoverRaf) cancelAnimationFrame(hoverRaf);
   hoverRaf = requestAnimationFrame(function() {
     var target = e.target;
-    clearChain();
+    // Don't clear chain highlight if a conflict group is actively selected
+    if (!window.activeGroupEl) clearChain();
     clearDefect();
 
     if (target.closest) {
-      var cg = target.closest('.conflict-elem') || target.closest('.conflict-panel-row');
-      if (cg && cg.dataset.conflictEid) highlightChain(cg.dataset.conflictEid);
       var dg = target.closest('.defect-group');
       if (dg && dg.dataset.defectEid) highlightDefect(dg.dataset.defectEid);
     }
@@ -1772,11 +1989,12 @@ document.addEventListener('mouseout', function(e) {
   if (!window.iterDataMeta) return;
   var related = e.relatedTarget;
   if (!related || !related.closest) {
-    clearChain(); clearDefect();
+    if (!window.activeGroupEl) clearChain();
+    clearDefect();
     document.getElementById('tooltip').style.display = 'none';
     return;
   }
-  if (!related.closest('.conflict-elem') && !related.closest('.conflict-panel-row')) clearChain();
+  if (!window.activeGroupEl) clearChain();
   if (!related.closest('.defect-group') && !related.closest('[data-eid]')) clearDefect();
   var inEid = related;
   while (inEid && inEid !== document.body) {
@@ -1789,70 +2007,57 @@ document.addEventListener('mouseout', function(e) {
 });
 
 // ═══════════════════════════════════════════════════════════════
-// Entry point: drop zone + file picker
+// Entry point: drop zones + file picker
 // ═══════════════════════════════════════════════════════════════
 
 (function() {
-  var dropZone = document.getElementById('drop-zone');
+  var sidebarDrop = document.getElementById('sidebar-drop');
+  var emptyState = document.getElementById('empty-state');
   var fileInput = document.getElementById('file-input');
-  var progress = document.getElementById('progress');
-  var progressText = document.getElementById('progress-text');
-  var errorMsg = document.getElementById('error-msg');
-  var loader = document.getElementById('loader');
+  var btnAdd = document.getElementById('btn-add');
 
-  dropZone.addEventListener('click', function() { fileInput.click(); });
-
-  dropZone.addEventListener('dragover', function(e) {
-    e.preventDefault();
-    dropZone.classList.add('dragover');
-  });
-  dropZone.addEventListener('dragleave', function() {
-    dropZone.classList.remove('dragover');
-  });
-  dropZone.addEventListener('drop', function(e) {
-    e.preventDefault();
-    dropZone.classList.remove('dragover');
-    var file = e.dataTransfer.files[0];
-    if (file) processFile(file);
-  });
-
-  fileInput.addEventListener('change', function(e) {
-    var file = e.target.files[0];
-    if (file) processFile(file);
-  });
-
-  async function processFile(file) {
-    errorMsg.style.display = 'none';
-    dropZone.style.display = 'none';
-    progress.style.display = 'flex';
-
-    try {
-      progressText.textContent = 'Reading file...';
-      var buffer = await file.arrayBuffer();
-
-      progressText.textContent = 'Decompressing gzip...';
-      var tarBytes = await decompressGzip(buffer);
-
-      progressText.textContent = 'Parsing tar archive...';
-      var fileMap = parseTar(tarBytes);
-
-      progressText.textContent = 'Loading rollout data (' + fileMap.size + ' files)...';
-      var rollout = loadRollout(fileMap);
-
-      progressText.textContent = 'Building viewer (' + rollout.iterations.length + ' iterations)...';
-      await new Promise(function(r) { setTimeout(r, 50); }); // Let UI update
-
-      buildViewer(rollout);
-      loader.style.display = 'none';
-
-    } catch (err) {
-      progress.style.display = 'none';
-      dropZone.style.display = 'flex';
-      errorMsg.style.display = 'block';
-      errorMsg.textContent = 'Error: ' + (err.message || err);
-      console.error(err);
-    }
+  function handleFiles(files) {
+    for (var i = 0; i < files.length; i++) addRollout(files[i]);
   }
+
+  // + button
+  btnAdd.addEventListener('click', function() { fileInput.click(); });
+
+  // Sidebar drop zone
+  sidebarDrop.addEventListener('click', function() { fileInput.click(); });
+  sidebarDrop.addEventListener('dragover', function(e) {
+    e.preventDefault();
+    sidebarDrop.classList.add('dragover');
+  });
+  sidebarDrop.addEventListener('dragleave', function() {
+    sidebarDrop.classList.remove('dragover');
+  });
+  sidebarDrop.addEventListener('drop', function(e) {
+    e.preventDefault();
+    sidebarDrop.classList.remove('dragover');
+    handleFiles(e.dataTransfer.files);
+  });
+
+  // Empty state drop zone + click
+  emptyState.addEventListener('click', function() { fileInput.click(); });
+  emptyState.addEventListener('dragover', function(e) {
+    e.preventDefault();
+    emptyState.classList.add('dragover');
+  });
+  emptyState.addEventListener('dragleave', function() {
+    emptyState.classList.remove('dragover');
+  });
+  emptyState.addEventListener('drop', function(e) {
+    e.preventDefault();
+    emptyState.classList.remove('dragover');
+    handleFiles(e.dataTransfer.files);
+  });
+
+  // File input
+  fileInput.addEventListener('change', function(e) {
+    handleFiles(e.target.files);
+    fileInput.value = '';
+  });
 })();
 </script>
 </body>
