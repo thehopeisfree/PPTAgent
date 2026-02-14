@@ -5,6 +5,13 @@ description: Coordinate a panel of AI advisors to discuss, debate, and execute a
 
 # AI Team
 
+| Member | Model | Role |
+|--------|-------|------|
+| **笨笨** | Opus 4.5 | 协调者 + 顾问 |
+| **O** | GPT-5.2 | 顾问 |
+| **G** | Gemini | 顾问 |
+| **小扣** | Claude Code CLI | 执行者 |
+
 An orchestrated multi-advisor workflow where specialized AI roles collaborate on a single task. The process ensures that proposals are challenged, refined, and merged before any code is written.
 
 ---
